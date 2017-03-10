@@ -142,20 +142,20 @@ bot.dialog('/', [
             if(!err){
 
                 // get the fair 
-                console.log(response.json);
+                //console.log(response.json);
 
                 console.log();
 
-                console.log(response.json.routes);
+                //console.log(response.json.routes);
 
                 console.log();
                 
                 // get the time, distance, and route
-                console.log(response.json.routes[0].legs);
+                //console.log(response.json.routes[0].legs);
 
                 console.log();
                 var legs = response.json.routes[0].legs[0];
-                console.log(legs);
+                //console.log(legs);
 
                 // send the depart time 
                 session.send("Depart Time: " + legs.departure_time.text);
@@ -172,21 +172,57 @@ bot.dialog('/', [
                 // send the steps
                 var f; 
                 for (f in legs.steps){console.log(legs.steps[f]);
-                console.log();}
+                    console.log();}
 
                 var q;
                 var r; 
                 for (q in legs.steps) {
 
-                    // log the big instruction 
-                    console.log(legs.steps[q].html_instructions);
+                    var string = ""
 
-                    for (r in legs.steps[q].steps){
-                        console.log(legs.steps[q].steps[r].html_instructions);
+                    if (legs.steps[q].travel_mode == 'WALKING')
+                    {
+                        // log the big instruction 
+                        string += (legs.steps[q].html_instructions);
+                        string += "\n";
 
-                        
+                        for (r in legs.steps[q].steps)
+                        {
+                            string += (legs.steps[q].steps[r].html_instructions);
+                            string += '\n';
+                        }
+                        session.send(string)
+                        console.log();
                     }
-                    console.log();
+
+                    else
+                    {
+                        // log the main html_instructions
+                        console.log(legs.steps[q].html_instructions);
+
+                        string += (legs.steps[q].html_instructions);
+
+                        var transit = legs.steps[q].transit_details; 
+
+                        string += ("Arrival Stop Name:" + transit.arrival_stop.name);
+                        string += '\n';
+
+                        string += ("Arrival Time: " + transit.arrival_time.text);
+                        string += '\n';
+
+                        string += ("Departure Stop Name: " + transit.departure_stop.name);
+                        string += '\n';
+
+                        string += ("Departure Time: " + transit.departure_time.text);
+                        string += '\n';
+
+                        string += ("Headsign: "+ transit.headsign);
+                        string += '\n';
+
+                        console.log();
+                        session.send(string);
+                    }
+                    
                 }
 
                 

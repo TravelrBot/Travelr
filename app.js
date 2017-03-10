@@ -1,6 +1,7 @@
 var restify = require('restify');
 var builder = require('botbuilder');
 var request = require('request');
+var Uber = require('node-uber');
 var googleMapsClient = require('@google/maps').createClient({
     key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' 
 });
@@ -229,10 +230,8 @@ bot.dialog('/', [
                         session.send(string);
                     }
                     
-                }
-
-                
-
+                }   
+                next();
             }
         
         // clean up
@@ -243,6 +242,61 @@ bot.dialog('/', [
         */
         });
 
+    },
+
+    function(session, args, results)
+    {
+        console.log("in uber");
+
+        // initialize an uber object
+        var uber = new Uber({
+            client_id: '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP',
+            client_secret: 'vAy-juG54SV15yiv7hsDgVMegvMDPbjbtuayZ48a',
+            server_token: '2By_BZgRZCMelkCHxVyWUCcTg1z6UfkPfo7UZM6O',
+            redirect_uri: '',
+            name: 'TravelrApp',
+        });
+
+        console.log(session.userData.start_lat);
+        console.log(session.userData.end_lat);
+
+        // get the price estimate information
+        uber.estimates.getPriceForRoute(session.userData.start_lat
+        , session.userData.start_long, session.userData.end_lat
+        , session.userData.end_long, function(err, res){
+
+            var prices = res.prices;
+
+            console.log(prices);
+
+            // send the duration and the distance 
+            var duration = prices[0].duration / 60
+            session.send("Duration: " + duration.toString() + " minutes");
+
+            session.send("Distance: " + prices[0].distance);
+
+            var u;
+            
+
+            for (u in prices) 
+            {
+                // blank string to hold the stats
+                var uber_string = "";
+                
+                uber_string += ("Name: " + prices[u].localized_display_name);
+                uber_string += " ";
+
+                uber_string += ("Surge Multiplier: " + prices[u].surge_multiplier);
+                uber_string += " ";
+
+                uber_string += ("Estimate: " + prices[u].estimate);
+                uber_string += " ";
+
+                // send the string 
+                session.send(uber_string);
+            }
+            
+        });
     }
 
 ]);

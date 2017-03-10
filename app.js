@@ -170,14 +170,23 @@ bot.dialog('/', [
                 session.send("Total Distance: " + legs.distance.text);
 
                 // send the steps
-                console.log(legs.steps[0].steps);
+                var f; 
+                for (f in legs.steps){console.log(legs.steps[f]);
+                console.log();}
 
                 var q;
                 var r; 
                 for (q in legs.steps) {
+
+                    // log the big instruction 
+                    console.log(legs.steps[q].html_instructions);
+
                     for (r in legs.steps[q].steps){
                         console.log(legs.steps[q].steps[r].html_instructions);
+
+                        
                     }
+                    console.log();
                 }
 
                 

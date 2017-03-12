@@ -3,7 +3,7 @@ var builder = require('botbuilder');
 var request = require('request');
 var Uber = require('node-uber');
 var googleMapsClient = require('@google/maps').createClient({
-    key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' 
+    key: process.env.GOOGLE_MAPS_KEY
 });
 
 // Setup Restify Server
@@ -26,6 +26,35 @@ server.get(/.*/, restify.serveStatic({
 	'default': 'Index.html'})
 );	
 
+
+// function to parse html 
+function HtmlParse (html) {
+
+    // declare the constants
+    html += ' ' 
+    var html_array = html.split("");
+    var html_return = '';
+
+    // loop through each word 
+    for (var i = 0; i < html_array.length; i+= 1)
+    {
+        if (html_array[i] == "<")
+        {
+            while (html_array[i] != '>' || html_array[i+1] == "<")
+            {
+                i++;
+            }
+
+            i++
+        }
+
+        html_return += html_array[i];
+    }
+
+    return (html_return.replace(/  /g, " ").trim());
+
+}
+
 //=========================================================
 // Bots Dialogs
 //=========================================================
@@ -42,8 +71,12 @@ bot.dialog('/', [
 
     // get the user's starting location
     function(session){
-        builder.Prompts.text(session, "What is your starting location");
+        builder.Prompts.text(session, "What is your starting location?");
     },
+
+//=========================================================
+// Google Geolocation
+//=========================================================
 
     // save the result
     function (session, result, next) {
@@ -112,21 +145,9 @@ bot.dialog('/', [
             next();
         }, 2000);
     },
-
-    /* get uber
-    function(session, args, next) {
-
-        
-        next();
-    }, 
-
-    // get lyft
-    function(session, args, next) {
-
-        next();
-    },
-
-    */
+//=========================================================
+// google transit information 
+//=========================================================
 
     // get transit
     function(session, arg, next) {
@@ -155,7 +176,7 @@ bot.dialog('/', [
 
                 //console.log(response.json.routes);
 
-                console.log();
+                //console.log();
                 
                 // get the time, distance, and route
                 //console.log(response.json.routes[0].legs);
@@ -164,75 +185,105 @@ bot.dialog('/', [
                 var legs = response.json.routes[0].legs[0];
                 //console.log(legs);
 
-                // send the depart time 
-                session.send("Depart Time: " + legs.departure_time.text);
+                if (legs.steps.length == 1)
+                {   
+                    // send the Distance
+                    session.send('Distance: ' + (legs.distance.text));
 
-                // send the arrival time 
-                session.send("Arrival Time: " + legs.arrival_time.text);
- 
-                // send the trip time
-                session.send("Total Time: " + legs.duration.text);
+                    // send the duration
+                    session.send('Duration: ' + (legs.duration.text));
 
-                // send the distance 
-                session.send("Total Distance: " + legs.distance.text);
+                    // send the main directions
+                    session.send( HtmlParse(legs.steps[0].html_instructions) );
 
-                // send the steps
-                var f; 
-                for (f in legs.steps){console.log(legs.steps[f]);
-                    console.log();}
+                    console.log(legs.steps[0].steps);
 
-                var q;
-                var r; 
-                for (q in legs.steps) {
+                    var g;
 
-                    var string = ""
-
-                    if (legs.steps[q].travel_mode == 'WALKING')
+                    for (g in legs.steps[0].steps)
                     {
-                        // log the big instruction 
-                        string += (legs.steps[q].html_instructions);
-                        string += "\n";
+                        session.send( HtmlParse(legs.steps[0].steps[g].html_instructions) );
+                    }
 
-                        for (r in legs.steps[q].steps)
+                }
+
+                else
+                {
+                    // send the depart time 
+                    session.send("Depart Time: " + legs.departure_time.text);
+
+                    // send the arrival time 
+                    session.send("Arrival Time: " + legs.arrival_time.text);
+    
+                    // send the trip time
+                    session.send("Total Time: " + legs.duration.text);
+
+                    // send the distance 
+                    session.send("Total Distance: " + legs.distance.text);
+
+                    // send the steps
+                    var f; 
+                    for (f in legs.steps){console.log(legs.steps[f]);
+                        console.log();}
+
+                    var q;
+                    var r; 
+                    for (q in legs.steps) {
+
+                        var string = ""
+
+                        if (legs.steps[q].travel_mode == 'WALKING')
                         {
-                            string += (legs.steps[q].steps[r].html_instructions);
-                            string += '\n';
+                            // log the big instruction 
+                            string += (HtmlParse(legs.steps[q].html_instructions));
+                            string += "\n";
+
+                            for (r in legs.steps[q].steps)
+                            {
+                                string += (HtmlParse(legs.steps[q].steps[r].html_instructions));
+                                string += '\n';
+                            }
+                            session.send(string)
+                            console.log();
                         }
-                        session.send(string)
-                        console.log();
+
+                        else
+                        {
+                            // log the main html_instructions
+                            console.log(legs.steps[q].html_instructions);
+
+                            string += (legs.steps[q].html_instructions);
+
+                            var transit = legs.steps[q].transit_details; 
+
+                            string += ("Arrival Stop Name:" + transit.arrival_stop.name);
+                            string += '\n';
+
+                            string += ("Arrival Time: " + transit.arrival_time.text);
+                            string += '\n';
+
+                            string += ("Departure Stop Name: " + transit.departure_stop.name);
+                            string += '\n';
+
+                            string += ("Departure Time: " + transit.departure_time.text);
+                            string += '\n';
+
+                            string += ("Headsign: "+ transit.headsign);
+                            string += '\n';
+
+                            console.log();
+                            session.send(string);
+                        }
                     }
-
-                    else
-                    {
-                        // log the main html_instructions
-                        console.log(legs.steps[q].html_instructions);
-
-                        string += (legs.steps[q].html_instructions);
-
-                        var transit = legs.steps[q].transit_details; 
-
-                        string += ("Arrival Stop Name:" + transit.arrival_stop.name);
-                        string += '\n';
-
-                        string += ("Arrival Time: " + transit.arrival_time.text);
-                        string += '\n';
-
-                        string += ("Departure Stop Name: " + transit.departure_stop.name);
-                        string += '\n';
-
-                        string += ("Departure Time: " + transit.departure_time.text);
-                        string += '\n';
-
-                        string += ("Headsign: "+ transit.headsign);
-                        string += '\n';
-
-                        console.log();
-                        session.send(string);
-                    }
-                    
-                }   
-                next();
+                } 
             }
+
+            else
+            {
+                console.log(err);
+            }   
+
+            next();
         
         // clean up
         /*
@@ -244,15 +295,19 @@ bot.dialog('/', [
 
     },
 
+//=========================================================
+// Uber information 
+//=========================================================
+
     function(session, args, next)
     {
         console.log("in uber");
 
         // initialize an uber object
         var uber = new Uber({
-            client_id: '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP',
-            client_secret: 'vAy-juG54SV15yiv7hsDgVMegvMDPbjbtuayZ48a',
-            server_token: '2By_BZgRZCMelkCHxVyWUCcTg1z6UfkPfo7UZM6O',
+            client_id: process.env.UBER_APP_ID,
+            client_secret: process.env.UBER_APP_PASSWORD,
+            server_token: process.env.UBER_APP_TOKEN,
             redirect_uri: '',
             name: 'TravelrApp',
         });
@@ -271,9 +326,9 @@ bot.dialog('/', [
 
             // send the duration and the distance 
             var duration = prices[0].duration / 60
-            session.send("Duration: " + duration.toString() + " minutes");
+            session.send("Duration: " + duration.toString() + "  minutes");
 
-            session.send("Distance: " + prices[0].distance);
+            session.send("Distance: " + prices[0].distance + "  miles");
 
             var u;
             
@@ -301,13 +356,13 @@ bot.dialog('/', [
         next();
     },
 
+//=========================================================
+// Lyft Information
+//=========================================================
     function (session, args, next)
     {
         
         var access_token; 
-
-        client_token = 'gAAAAABYw0rkJ3ukCF7xG_88XPPRK0fguyi2Ub2RF2gOnwcY7z8bQYflrhwkh24c3OsHAfBtH0Xbb8r-VQxmk8y01BBl-SymiBE8Lz0wlkG5Sa2VdQUo86AP1ncyRpGKQ_rYc66jfExJ_m1bpEaotykPMVNZzrObZ0JVEBdPRbDhZ4dXLbIQ_l4='
-        client_secret = '9Jz-WN7J3dMoVFcMhw9wGtVcDg1fK1gV'
 
         var headers = {
             'Content-Type': 'application/json'
@@ -321,8 +376,8 @@ bot.dialog('/', [
             headers: headers,
             body: dataString,
             auth: {
-                'user': '9LHHn1wknlgs',
-                'pass': '9Jz-WN7J3dMoVFcMhw9wGtVcDg1fK1gV'
+                'user': process.env.LYFT_APP_ID,
+                'pass': process.env.LYFT_APP_PASSWORD
             }
         };
 
@@ -370,6 +425,12 @@ bot.dialog('/', [
                         var lyft_pared = JSON.parse(res);
                         console.log(lyft_pared);
 
+                        session.send('Distance: ' + 
+                        lyft_pared.cost_estimates[0].estimated_distance_miles + ' miles');
+
+                        var duration = (lyft_pared.cost_estimates[0].estimated_duration_seconds / 60).toFixed(2);
+                        session.send("Duration: " + duration + ' minutes');
+
                         var l; 
                         for (l in lyft_pared.cost_estimates)
                         {
@@ -378,12 +439,6 @@ bot.dialog('/', [
 
                             lyft_string += 'Ride Type: ' +
                             lyft_pared.cost_estimates[l].ride_type + "  ";
-
-                            lyft_string += 'Distance: ' + 
-                            lyft_pared.cost_estimates[l].estimated_distance_miles + '  ';
-
-                            var duration = lyft_pared.cost_estimates[l].estimated_duration_seconds / 60;
-                            lyft_string += "Duration: " + duration + 'miles   ';
 
                             var cost_min = lyft_pared.cost_estimates[l].estimated_cost_cents_min / 100;
                             var cost_max = lyft_pared.cost_estimates[l].estimated_cost_cents_max / 100;

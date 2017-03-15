@@ -3,7 +3,7 @@ var builder = require('botbuilder');
 var request = require('request');
 var Uber = require('node-uber');
 var googleMapsClient = require('@google/maps').createClient({
-    key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' //process.env.GOOGLE_MAPS_KEY
+    key: process.env.GOOGLE_MAPS_KEY
 });
 
 // Setup Restify Server
@@ -320,9 +320,9 @@ bot.dialog('/waterfall', [
 
         // initialize an uber object
         var uber = new Uber({
-            client_id: '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP', //process.env.UBER_APP_ID,
-            client_secret: 'vAy-juG54SV15yiv7hsDgVMegvMDPbjbtuayZ48a' ,//process.env.UBER_APP_PASSWORD,
-            server_token: '2By_BZgRZCMelkCHxVyWUCcTg1z6UfkPfo7UZM6O' , //process.env.UBER_APP_TOKEN,
+            client_id: process.env.UBER_APP_ID,
+            client_secret: process.env.UBER_APP_PASSWORD,
+            server_token: process.env.UBER_APP_TOKEN,
             redirect_uri: '',
             name: 'TravelrApp',
         });
@@ -421,8 +421,8 @@ bot.dialog('/waterfall', [
             headers: headers,
             body: dataString,
             auth: {
-                'user': '9LHHn1wknlgs', //process.env.LYFT_APP_ID,
-                'pass': '9Jz-WN7J3dMoVFcMhw9wGtVcDg1fK1gV' //process.env.LYFT_APP_PASSWORD
+                'user': process.env.LYFT_APP_ID,
+                'pass': process.env.LYFT_APP_PASSWORD
             }
         };
 

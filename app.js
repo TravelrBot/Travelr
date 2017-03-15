@@ -3,7 +3,7 @@ var builder = require('botbuilder');
 var request = require('request');
 var Uber = require('node-uber');
 var googleMapsClient = require('@google/maps').createClient({
-    key: process.env.GOOGLE_MAPS_KEY
+    key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' //process.env.GOOGLE_MAPS_KEY
 });
 
 // Setup Restify Server
@@ -11,6 +11,7 @@ var server = restify.createServer();
 server.listen(process.env.port || process.env.PORT || 3978, function () {
    console.log('%s listening to %s', server.name, server.url); 
 });
+
   
 // Create chat bot
 var connector = new builder.ChatConnector({
@@ -25,6 +26,9 @@ server.get(/.*/, restify.serveStatic({
 	'directory': '.',
 	'default': 'Index.html'})
 );	
+
+// create intents
+//var intents = new builder.IntentDialog();
 
 
 // function to parse html 
@@ -59,7 +63,13 @@ function HtmlParse (html) {
 // Bots Dialogs
 //=========================================================
 
-bot.dialog('/', [
+bot.dialog('/', new builder.IntentDialog()
+    .matches('lyft', '/lyft')
+    .matches('uber', '/uber')
+    .matches('transit', '/transit')
+    .onDefault('/waterfall'));
+
+bot.dialog('/waterfall', [
 
     // send the intro
     function (session, args, next){
@@ -146,7 +156,7 @@ bot.dialog('/', [
         }, 2000);
     },
 //=========================================================
-// google transit information 
+// Google transit information 
 //=========================================================
 
     // get transit
@@ -170,112 +180,124 @@ bot.dialog('/', [
             if(!err){
 
                 // get the fair 
-                //console.log(response.json);
+                console.log(response.json.status);
 
-                console.log();
-
-                //console.log(response.json.routes);
-
-                //console.log();
-                
-                // get the time, distance, and route
-                //console.log(response.json.routes[0].legs);
-
-                console.log();
-                var legs = response.json.routes[0].legs[0];
-                //console.log(legs);
-
-                if (legs.steps.length == 1)
-                {   
-                    // send the Distance
-                    session.send('Distance: ' + (legs.distance.text));
-
-                    // send the duration
-                    session.send('Duration: ' + (legs.duration.text));
-
-                    // send the main directions
-                    session.send( HtmlParse(legs.steps[0].html_instructions) );
-
-                    console.log(legs.steps[0].steps);
-
-                    var g;
-
-                    for (g in legs.steps[0].steps)
-                    {
-                        session.send( HtmlParse(legs.steps[0].steps[g].html_instructions) );
-                    }
-
+                if (response.json.status == "ZERO_RESULTS" || response.json.status == "NOT_FOUND")
+                {
+                    session.send("Transit is not available in this area.")
                 }
 
                 else
                 {
-                    // send the depart time 
-                    session.send("Depart Time: " + legs.departure_time.text);
+                    //console.log();
 
-                    // send the arrival time 
-                    session.send("Arrival Time: " + legs.arrival_time.text);
-    
-                    // send the trip time
-                    session.send("Total Time: " + legs.duration.text);
+                    //console.log(response.json.routes);
 
-                    // send the distance 
-                    session.send("Total Distance: " + legs.distance.text);
+                    //console.log();
+                    
+                    // get the time, distance, and route
+                    //console.log(response.json.routes[0].legs);
 
-                    // send the steps
-                    var f; 
-                    for (f in legs.steps){console.log(legs.steps[f]);
-                        console.log();}
+                    console.log();
+                    var legs = response.json.routes[0].legs[0];
+                
+                    //console.log(legs);
 
-                    var q;
-                    var r; 
-                    for (q in legs.steps) {
 
-                        var string = ""
+                    if (legs.steps.length == 1)
+                    {   
+                        // send the Distance
+                        session.send('Transit -> Distance: ' + (legs.distance.text) +
+                        'Duration: ' + (legs.duration.text) + 
+                        HtmlParse(legs.steps[0].html_instructions) );
 
-                        if (legs.steps[q].travel_mode == 'WALKING')
+                        // console.log(legs.steps[0].steps);
+
+                        var g;
+                        var google_array = [];
+
+                        for (g in legs.steps[0].steps)
                         {
-                            // log the big instruction 
-                            string += (HtmlParse(legs.steps[q].html_instructions));
-                            string += "\n";
-
-                            for (r in legs.steps[q].steps)
-                            {
-                                string += (HtmlParse(legs.steps[q].steps[r].html_instructions));
-                                string += '\n';
-                            }
-                            session.send(string)
-                            console.log();
+                            google_array.push( HtmlParse(legs.steps[0].steps[g].html_instructions) );
                         }
 
-                        else
-                        {
-                            // log the main html_instructions
-                            console.log(legs.steps[q].html_instructions);
+                        // add the array to the userData
+                        session.userData.google_array = google_array;
 
-                            string += (legs.steps[q].html_instructions);
-
-                            var transit = legs.steps[q].transit_details; 
-
-                            string += ("Arrival Stop Name:" + transit.arrival_stop.name);
-                            string += '\n';
-
-                            string += ("Arrival Time: " + transit.arrival_time.text);
-                            string += '\n';
-
-                            string += ("Departure Stop Name: " + transit.departure_stop.name);
-                            string += '\n';
-
-                            string += ("Departure Time: " + transit.departure_time.text);
-                            string += '\n';
-
-                            string += ("Headsign: "+ transit.headsign);
-                            string += '\n';
-
-                            console.log();
-                            session.send(string);
-                        }
                     }
-                } 
+
+                    else
+                    {
+                        // send the depart time 
+                        session.send("Transit -> Depart Time: " + 
+                        legs.departure_time.text + "Arrival Time: " + 
+                        legs.arrival_time.text + "Total Time: " + 
+                        legs.duration.text + "Total Distance: " + 
+                        legs.distance.text);
+
+                        // send the steps
+                        //var f; 
+                        //for (f in legs.steps){console.log(legs.steps[f]);
+                            //console.log();}
+
+                        var q;
+                        var r; 
+                        var google_array = [];
+                        for (q in legs.steps) {
+
+                            var string = ""
+
+                            if (legs.steps[q].travel_mode == 'WALKING')
+                            {
+                                // log the big instruction 
+                                string += (HtmlParse(legs.steps[q].html_instructions));
+                                string += "\n";
+
+                                for (r in legs.steps[q].steps)
+                                {
+                                    string += (HtmlParse(legs.steps[q].steps[r].html_instructions));
+                                    string += '\n';
+                                }
+                                
+                                // add the string to the array
+                                google_array.push(string);
+                            }
+
+                            else
+                            {
+                                // log the main html_instructions
+                                console.log(legs.steps[q].html_instructions);
+
+                                string += (legs.steps[q].html_instructions);
+
+                                var transit = legs.steps[q].transit_details; 
+
+                                string += ("Arrival Stop Name:" + transit.arrival_stop.name);
+                                string += '\n';
+
+                                string += ("Arrival Time: " + transit.arrival_time.text);
+                                string += '\n';
+
+                                string += ("Departure Stop Name: " + transit.departure_stop.name);
+                                string += '\n';
+
+                                string += ("Departure Time: " + transit.departure_time.text);
+                                string += '\n';
+
+                                string += ("Headsign: "+ transit.headsign);
+                                string += '\n';
+
+                                
+                                google_array.push(string);
+                            }
+                        }
+
+                        // save the transit information
+                        session.userData.google_array = google_array;
+
+                    } // end else if steps are longer than 1
+
+                } // end else after check for no results     
             }
 
             else
@@ -284,13 +306,6 @@ bot.dialog('/', [
             }   
 
             next();
-        
-        // clean up
-        /*
-        session.clearDialogStack();
-        session.endDialog();
-        session.endConversation();
-        */
         });
 
     },
@@ -305,54 +320,84 @@ bot.dialog('/', [
 
         // initialize an uber object
         var uber = new Uber({
-            client_id: process.env.UBER_APP_ID,
-            client_secret: process.env.UBER_APP_PASSWORD,
-            server_token: process.env.UBER_APP_TOKEN,
+            client_id: '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP', //process.env.UBER_APP_ID,
+            client_secret: 'vAy-juG54SV15yiv7hsDgVMegvMDPbjbtuayZ48a' ,//process.env.UBER_APP_PASSWORD,
+            server_token: '2By_BZgRZCMelkCHxVyWUCcTg1z6UfkPfo7UZM6O' , //process.env.UBER_APP_TOKEN,
             redirect_uri: '',
             name: 'TravelrApp',
         });
-
-        console.log(session.userData.start_lat);
-        console.log(session.userData.end_lat);
 
         // get the price estimate information
         uber.estimates.getPriceForRoute(session.userData.start_lat
         , session.userData.start_long, session.userData.end_lat
         , session.userData.end_long, function(err, res){
-
+        
+        try
+        {   
             var prices = res.prices;
 
-            console.log(prices);
+            console.log(res);
 
-            // send the duration and the distance 
-            var duration = prices[0].duration / 60
-            session.send("Duration: " + duration.toString() + "  minutes");
-
-            session.send("Distance: " + prices[0].distance + "  miles");
-
-            var u;
-            
-
-            for (u in prices) 
+            // check to see if response is empty
+            if (prices[0] == null)
             {
-                // blank string to hold the stats
-                var uber_string = "";
-                
-                uber_string += ("Name: " + prices[u].localized_display_name);
-                uber_string += " ";
-
-                uber_string += ("Surge Multiplier: " + prices[u].surge_multiplier);
-                uber_string += " ";
-
-                uber_string += ("Estimate: " + prices[u].estimate);
-                uber_string += " ";
-
-                // send the string 
-                session.send(uber_string);
+                session.send("Uber is not available in this area.");
             }
-            
-        });
 
+            else
+            {
+                // send the duration and the distance 
+                var duration = prices[0].duration / 60;
+                session.send("Uber:  Duration: " + duration.toString() + "  minutes" +
+                "Distance: " + prices[0].distance + "  miles");
+
+                var u;
+                var uber_array = [];
+                
+
+                for (u in prices) 
+                {
+                    // blank string to hold the stats
+                    var uber_string = "";
+                    
+                    uber_string += ("Name: " + prices[u].localized_display_name);
+                    uber_string += " ";
+
+                    uber_string += ("Surge Multiplier: " + prices[u].surge_multiplier);
+                    uber_string += " ";
+
+                    uber_string += ("Estimate: " + prices[u].estimate);
+                    uber_string += " ";
+
+                    // check to see if the uberx
+                    // send the information for the cheapest one
+                    if (prices[u].localized_display_name.toLowerCase() == 'uberx')
+                    {
+                        session.send(uber_string);
+                    }
+
+                    // send uber array 
+                    uber_array.push(uber_string);
+                } // end the for loop
+
+                // save the array to user data 
+                session.userData.uber_array = uber_array;
+
+            } // ends else in uber
+        
+        } // ends try
+
+        catch (err)
+        {
+            session.send("An error occured while searching for uber in this location." +
+            "It may not be available in this area. Please check your locations!")
+
+            console.log(err);
+        }
+            
+    }); // end of uber function 
+
+        // advance to next step
         next();
     },
 
@@ -376,8 +421,8 @@ bot.dialog('/', [
             headers: headers,
             body: dataString,
             auth: {
-                'user': process.env.LYFT_APP_ID,
-                'pass': process.env.LYFT_APP_PASSWORD
+                'user': '9LHHn1wknlgs', //process.env.LYFT_APP_ID,
+                'pass': '9Jz-WN7J3dMoVFcMhw9wGtVcDg1fK1gV' //process.env.LYFT_APP_PASSWORD
             }
         };
 
@@ -385,9 +430,8 @@ bot.dialog('/', [
             if (err){
                 console.log(err);
             }
-
-            else{
-
+            else
+            {
                 // get the access token 
                 var parsed = JSON.parse(res);
                 var access_token = parsed.access_token;
@@ -414,47 +458,197 @@ bot.dialog('/', [
 
                 request(options, function(err, obj, res)
                 {
-                    if (err)
+
+                    try
                     {
-                        console.log(err);
-                    }
-
-                    else
-                    {
-                        // parse the json 
-                        var lyft_pared = JSON.parse(res);
-                        console.log(lyft_pared);
-
-                        session.send('Distance: ' + 
-                        lyft_pared.cost_estimates[0].estimated_distance_miles + ' miles');
-
-                        var duration = (lyft_pared.cost_estimates[0].estimated_duration_seconds / 60).toFixed(2);
-                        session.send("Duration: " + duration + ' minutes');
-
-                        var l; 
-                        for (l in lyft_pared.cost_estimates)
+                        if (err)
                         {
-                            // string to hold information
-                            var lyft_string = "";
+                        console.log(err);
+                        } // end if 
 
-                            lyft_string += 'Ride Type: ' +
-                            lyft_pared.cost_estimates[l].ride_type + "  ";
+                        else
+                        {
+                            // parse the json 
+                            var lyft_pared = JSON.parse(res);
+                            console.log(lyft_pared);
 
-                            var cost_min = lyft_pared.cost_estimates[l].estimated_cost_cents_min / 100;
-                            var cost_max = lyft_pared.cost_estimates[l].estimated_cost_cents_max / 100;
-                            lyft_string += "Cost Estimate: $" + cost_min + "-" + cost_max + '  ';
+                            if (lyft_pared.error)
+                            {
+                                session.send("Lyft is not available in this area --> " + lyft_pared.error_description);
+                            } // end if 
 
-                            lyft_string += 'Primetime Percentage: ' +
-                            lyft_pared.cost_estimates[l].primetime_percentage + '  ';
+                            else
+                            {
+                                var duration = (lyft_pared.cost_estimates[0].estimated_duration_seconds / 60).toFixed(2);
 
-                            session.send(lyft_string);
-                        }
-                    }
-                })
-            }
+                                session.send("Lyft: " +
+                                'Distance: ' + lyft_pared.cost_estimates[0]
+                                .estimated_distance_miles + ' miles ' + 
+                                "Duration: " + duration + ' minutes');
 
-        });
+                                var l; 
+                                var lyft_array = [];
+                                for (l in lyft_pared.cost_estimates)
+                                {
+                                    // string to hold information
+                                    var lyft_string = "";
 
+                                    lyft_string += 'Ride Type: ' +
+                                    lyft_pared.cost_estimates[l].ride_type + "  ";
+
+                                    var cost_min = lyft_pared.cost_estimates[l].estimated_cost_cents_min / 100;
+                                    var cost_max = lyft_pared.cost_estimates[l].estimated_cost_cents_max / 100;
+                                    lyft_string += "Cost Estimate: $" + cost_min + "-" + cost_max + '  ';
+
+                                    lyft_string += 'Primetime Percentage: ' +
+                                    lyft_pared.cost_estimates[l].primetime_percentage + '  ';
+
+                                    // check to see if name is lyft
+                                    // send the cheapest information
+                                    if (lyft_pared.cost_estimates[l].ride_type.toLowerCase() == 'lyft')
+                                    {
+                                        session.send(lyft_string);
+                                    } // end if
+
+                                    // push the information to the array
+                                    lyft_array.push(lyft_string);
+
+                                } // end for
+
+                                // save the array for access later if the user choose
+                                session.userData.lyft_array = lyft_array;
+
+                            } // end else 
+                        } // end else
+
+                    } // end try
+
+                    catch (err)
+                    {
+                        session.send("An error occured while looking searching for Lyft in this location" +
+                        "Lyft may not be available in this area. Please check your location.");
+
+                    } // end catch
+
+                }); // end request to Lyft for Info
+
+            } // end else after initial request for token
+
+        }); // end request for token
+
+        next();
+    } ,
+
+    function (session, args, next)
+    {
+        session.sendBatch();
+
+        setTimeout(function() {
+            builder.Prompts.choice(session, "Want more info? Type the number",
+            "Transit|Uber|Lyft");
+        }, 4000);
+        
+    },
+
+    function (session, results, next) 
+    {
+        // check to see if results error
+
+        if (results.response.entity.toLowerCase() == "lyft" || 
+        results.response.index == 2)
+        {
+            session.beginDialog('/lyft');
+        }
+
+        else if (results.response.entity.toLowerCase() == "uber" ||
+        results.response.index == 1)
+        {
+            session.beginDialog('/uber');
+        }
+
+        else if (results.response.entity.toLowerCase() == "transit" ||
+        results.response.index == 0)
+        {
+            session.beginDialog('/transit');
+        }
+        else
+        {
+            session.endDialog();
+            session.endConversation();
+        } 
     }
-
 ]);
+
+bot.dialog('/lyft', [
+
+    function (session)
+    {   
+        // Tell the customer they are getting lyft information
+        session.send("Okay let me send you the information on Lyft")
+
+        // holding variable to loop through lyft_dialog
+        var ld;
+        
+        // local variable of the lyft information
+        lyft_array = session.userData.lyft_array;
+
+        // for loop to go throught the array of string
+        for (ld in lyft_array)
+        {
+            session.send(lyft_array[ld]);
+        }
+
+        session.endDialog();
+    },
+
+    function (session)
+    {
+        session.endConversation();
+    }
+])
+
+bot.dialog('/uber', [
+    
+    function (session)
+    {
+        // Tell customer we are getting uber information
+        session.send("Okay let me send you the information on Uber")
+
+        // holding variable to loop through the Uber Dialogs
+        var ud;
+
+        // local variable to go through the array of strings
+        uber_array = session.userData.uber_array;
+
+        // for loop to go through the array of strings
+        for (ud in uber_array)
+        {
+            session.send(uber_array[ud]);
+        }
+
+        session.endDialog();
+    }
+])
+
+bot.dialog('/transit', [
+
+    function(session)
+    {
+        // Tell customer we are getting transit information
+        session.send("Okay let me send you the information on Transit")
+
+        // holding variable to loop through the Uber Dialogs
+        var gd;
+
+        // local variable to go through the array of strings
+        google_array = session.userData.google_array;
+
+        // for loop to go through the array of strings
+        for (gd in google_array)
+        {
+            session.send(google_array[gd]);
+        }
+
+        session.endDialog();
+    }
+])

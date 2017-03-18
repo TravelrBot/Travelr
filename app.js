@@ -3,7 +3,7 @@ var builder = require('botbuilder');
 var request = require('request');
 var Uber = require('node-uber');
 var googleMapsClient = require('@google/maps').createClient({
-    key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' //process.env.GOOGLE_MAPS_KEY
+    key: process.env.GOOGLE_MAPS_KEY
 });
 
 // Setup Restify Server
@@ -320,9 +320,9 @@ bot.dialog('/waterfall', [
 
         // initialize an uber object
         var uber = new Uber({
-            client_id: '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP', //process.env.UBER_APP_ID,
-            client_secret: 'vAy-juG54SV15yiv7hsDgVMegvMDPbjbtuayZ48a' ,//process.env.UBER_APP_PASSWORD,
-            server_token: '2By_BZgRZCMelkCHxVyWUCcTg1z6UfkPfo7UZM6O' , //process.env.UBER_APP_TOKEN,
+            client_id: process.env.UBER_APP_ID,
+            client_secret: process.env.UBER_APP_PASSWORD,
+            server_token: process.env.UBER_APP_TOKEN,
             redirect_uri: '',
             name: 'TravelrApp',
         });
@@ -465,8 +465,8 @@ bot.dialog('/waterfall', [
             headers: headers,
             body: dataString,
             auth: {
-                'user': '9LHHn1wknlgs', //process.env.LYFT_APP_ID,
-                'pass': '9Jz-WN7J3dMoVFcMhw9wGtVcDg1fK1gV' //process.env.LYFT_APP_PASSWORD
+                'user': process.env.LYFT_APP_ID,
+                'pass': process.env.LYFT_APP_PASSWORD
             }
         };
 
@@ -581,9 +581,9 @@ bot.dialog('/waterfall', [
                         'Authorization': 'bearer ' + access_token
                         };
 
-                        var url_lyft = 'https://api.lyft.com/v1/eta?start_lat=' + 
-                            session.userData.start_lat + '&start_lng=' + 
-                            session.userData.start_long + '&end_lat=';
+                        var url_lyft = 'https://api.lyft.com/v1/eta?lat=' + 
+                            session.userData.start_lat + '&lng=' + 
+                            session.userData.start_long;
 
                         // create the get request 
                         var options = {
@@ -603,7 +603,7 @@ bot.dialog('/waterfall', [
                             else
                             {
                                 var lyft_pared_eta = JSON.parse(body);
-                                
+                                console.log(lyft_pared_eta);
 
                                 // loop through the array
                                 // place the time information in lyft_dict
@@ -699,25 +699,20 @@ bot.dialog('/lyft', [
         // local variable of the lyft information
         lyft_array = session.userData.lyft_array;
 
-        // for loop to go throught the array of string
-        for (ld in lyft_array)
+        // loop through the array and its parts
+        for (var la in lyft_array)
         {
+            // create a holding variable 
+            var lyft_string = "";
 
-            // loop through the array and its parts
-            for (var la in lyft_array)
+            // loop through the objects within the array
+            for (var lp in lyft_array[la])
             {
-                // create a holding variable 
-                var lyft_string = "";
-
-                // loop through the objects within the array
-                for (var lp in lyft_array[la])
-                {
-                    lyft_string += (lp + ": " + lyft_array[la][lp] + "-->" );
-                }
-
-                // send the information to the user 
-                session.send(lyft_string);
+                lyft_string += (lp + ": " + lyft_array[la][lp] + "-->" );
             }
+
+            // send the information to the user 
+            session.send(lyft_string);
         }
 
         session.endDialog();

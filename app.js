@@ -3,7 +3,7 @@ var builder = require('botbuilder');
 var request = require('request');
 var Uber = require('node-uber');
 var googleMapsClient = require('@google/maps').createClient({
-    key: process.env.GOOGLE_MAPS_KEY
+    key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' //process.env.GOOGLE_MAPS_KEY
 });
 
 // Setup Restify Server
@@ -230,10 +230,10 @@ bot.dialog('/waterfall', [
                     {
                         // send the depart time 
                         session.send("Transit -> Depart Time: " + 
-                        legs.departure_time.text + "Arrival Time: " + 
-                        legs.arrival_time.text + "Total Time: " + 
-                        legs.duration.text + "Total Distance: " + 
-                        legs.distance.text);
+                        legs.departure_time.text + " " + "Arrival Time: " + 
+                        legs.arrival_time.text + " " + "Total Time: " + 
+                        legs.duration.text + " " + "Total Distance: " + 
+                        legs.distance.text + " ");
 
                         // send the steps
                         //var f; 
@@ -320,9 +320,9 @@ bot.dialog('/waterfall', [
 
         // initialize an uber object
         var uber = new Uber({
-            client_id: process.env.UBER_APP_ID,
-            client_secret: process.env.UBER_APP_PASSWORD,
-            server_token: process.env.UBER_APP_TOKEN,
+            client_id: '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP', //process.env.UBER_APP_ID,
+            client_secret: 'vAy-juG54SV15yiv7hsDgVMegvMDPbjbtuayZ48a' ,//process.env.UBER_APP_PASSWORD,
+            server_token: '2By_BZgRZCMelkCHxVyWUCcTg1z6UfkPfo7UZM6O' , //process.env.UBER_APP_TOKEN,
             redirect_uri: '',
             name: 'TravelrApp',
         });
@@ -358,27 +358,71 @@ bot.dialog('/waterfall', [
                 for (u in prices) 
                 {
                     // blank string to hold the stats
-                    var uber_string = "";
-                    
-                    uber_string += ("Name: " + prices[u].localized_display_name);
-                    uber_string += " ";
-
-                    uber_string += ("Surge Multiplier: " + prices[u].surge_multiplier);
-                    uber_string += " ";
-
-                    uber_string += ("Estimate: " + prices[u].estimate);
-                    uber_string += " ";
+                    var uber_dict = {
+                        "Name": prices[u].localized_display_name,
+                        "Surge Multipler": prices[u].surge_multiplier,
+                        "Estimate": prices[u].estimate
+                    };
 
                     // check to see if the uberx
                     // send the information for the cheapest one
                     if (prices[u].localized_display_name.toLowerCase() == 'uberx')
-                    {
+                    {   
+                        var uber_string = '';
+
+                        for (var element in uber_dict)
+                        {
+                            uber_string += element.toString() + ":  " + uber_dict[element] + " ";
+                        }
+
                         session.send(uber_string);
                     }
 
                     // send uber array 
-                    uber_array.push(uber_string);
+                    uber_array.push(uber_dict);
+
                 } // end the for loop
+
+                uber.estimates.
+                getETAForLocationAsync(session.userData.start_lat, 
+                session.userData.start_long, function(err, res)
+                {
+                    if(err)
+                    {
+                        console.log(err);
+                    } // end if err
+
+                    else
+                    {
+                        var times = res.times;
+
+                        if (times[0] == null)
+                        {
+                            console.log("No times");
+                        }
+
+                        else
+                        {
+                            for (var ut in times)
+                            {
+                                for (var ua in uber_array)
+                                {
+                                    if (times[ut].localized_display_name == uber_array[ua].Name)
+                                    {
+                                        uber_array[ua].Time = ((times[ut].estimate/60).toString() + " Minutes Away");
+                                    }
+
+                                    else
+                                    {
+                                        continue;
+                                    }
+                                }
+                            }
+                            
+                        }  // else for if data is sent
+
+                    } // end else - res 
+                })
 
                 // save the array to user data 
                 session.userData.uber_array = uber_array;
@@ -395,7 +439,7 @@ bot.dialog('/waterfall', [
             console.log(err);
         }
             
-    }); // end of uber function 
+    }); // end of uber function for price estimates
 
         // advance to next step
         next();
@@ -421,8 +465,8 @@ bot.dialog('/waterfall', [
             headers: headers,
             body: dataString,
             auth: {
-                'user': process.env.LYFT_APP_ID,
-                'pass': process.env.LYFT_APP_PASSWORD
+                'user': '9LHHn1wknlgs', //process.env.LYFT_APP_ID,
+                'pass': '9Jz-WN7J3dMoVFcMhw9wGtVcDg1fK1gV' //process.env.LYFT_APP_PASSWORD
             }
         };
 
@@ -463,7 +507,7 @@ bot.dialog('/waterfall', [
                     {
                         if (err)
                         {
-                        console.log(err);
+                            console.log(err);
                         } // end if 
 
                         else
@@ -478,48 +522,111 @@ bot.dialog('/waterfall', [
                             } // end if 
 
                             else
-                            {
+                            {   
+
                                 var duration = (lyft_pared.cost_estimates[0].estimated_duration_seconds / 60).toFixed(2);
 
                                 session.send("Lyft: " +
                                 'Distance: ' + lyft_pared.cost_estimates[0]
-                                .estimated_distance_miles + ' miles ' + 
-                                "Duration: " + duration + ' minutes');
+                                .estimated_distance_miles + ' miles   ' + 
+                                "Duration: " + duration + ' minutes  ');
 
                                 var l; 
                                 var lyft_array = [];
                                 for (l in lyft_pared.cost_estimates)
                                 {
-                                    // string to hold information
-                                    var lyft_string = "";
-
-                                    lyft_string += 'Ride Type: ' +
-                                    lyft_pared.cost_estimates[l].ride_type + "  ";
-
+                                    
+                                    // get the cost informaiton
                                     var cost_min = lyft_pared.cost_estimates[l].estimated_cost_cents_min / 100;
                                     var cost_max = lyft_pared.cost_estimates[l].estimated_cost_cents_max / 100;
-                                    lyft_string += "Cost Estimate: $" + cost_min + "-" + cost_max + '  ';
+                                    var cost_string = "$" + cost_min.toString() + "--" + cost_max.toString();
 
-                                    lyft_string += 'Primetime Percentage: ' +
-                                    lyft_pared.cost_estimates[l].primetime_percentage + '  ';
+                                    // string to hold information
+                                    var lyft_dict = 
+                                    {
+                                        "Ride Type": lyft_pared.cost_estimates[l].display_name,
+                                        "Cost Estimate": cost_string,
+                                        "Primetime Percentage": lyft_pared.cost_estimates[l].primetime_percentage
+                                    }
 
                                     // check to see if name is lyft
                                     // send the cheapest information
                                     if (lyft_pared.cost_estimates[l].ride_type.toLowerCase() == 'lyft')
                                     {
+                                        var lyft_string = "";
+
+                                        for (var ls in lyft_dict)
+                                        {
+                                            lyft_string += ls.toString() + ":  " + lyft_dict[ls] + "-->";
+                                        }
+
+                                        // send the basic info
                                         session.send(lyft_string);
+
                                     } // end if
 
                                     // push the information to the array
-                                    lyft_array.push(lyft_string);
+                                    lyft_array.push(lyft_dict);
 
                                 } // end for
 
-                                // save the array for access later if the user choose
-                                session.userData.lyft_array = lyft_array;
-
                             } // end else 
+
                         } // end else
+
+                        // Lyft for ETA Drivers
+
+                        var headers = 
+                        {
+                        'Authorization': 'bearer ' + access_token
+                        };
+
+                        var url_lyft = 'https://api.lyft.com/v1/eta?start_lat=' + 
+                            session.userData.start_lat + '&start_lng=' + 
+                            session.userData.start_long + '&end_lat=';
+
+                        // create the get request 
+                        var options = {
+                            url: url_lyft,
+                            method: "GET",
+                            headers: headers,
+                        };
+
+                        // send the request to get the driver eta
+                        request(options, function(error, response, body)
+                        {
+                            if(error)
+                            {
+                                console.log(error);
+                            }
+
+                            else
+                            {
+                                var lyft_pared_eta = JSON.parse(body);
+                                
+
+                                // loop through the array
+                                // place the time information in lyft_dict
+                                for (var la in lyft_pared_eta["eta_estimates"])
+                                {
+                                    for (var lt in lyft_array)
+                                    {
+                                        if (lyft_pared_eta['eta_estimates'][la]["display_name"] == lyft_array[lt]["Ride Type"])
+                                        {
+                                            lyft_array[lt].Driver = ((lyft_pared_eta['eta_estimates'][la]["eta_seconds"] / 60).toString() + " Minutes Away");
+                                        }
+                                        else
+                                        {
+                                            continue
+                                        }
+                                    }
+                                }
+
+                                // save the information
+                                session.userData.lyft_array = lyft_array;
+                            }
+
+                        }) // end request for driver eta 
 
                     } // end try
 
@@ -595,7 +702,22 @@ bot.dialog('/lyft', [
         // for loop to go throught the array of string
         for (ld in lyft_array)
         {
-            session.send(lyft_array[ld]);
+
+            // loop through the array and its parts
+            for (var la in lyft_array)
+            {
+                // create a holding variable 
+                var lyft_string = "";
+
+                // loop through the objects within the array
+                for (var lp in lyft_array[la])
+                {
+                    lyft_string += (lp + ": " + lyft_array[la][lp] + "-->" );
+                }
+
+                // send the information to the user 
+                session.send(lyft_string);
+            }
         }
 
         session.endDialog();
@@ -623,7 +745,14 @@ bot.dialog('/uber', [
         // for loop to go through the array of strings
         for (ud in uber_array)
         {
-            session.send(uber_array[ud]);
+            var uber_string = "";
+
+            for (var ub in uber_array[ud])
+            {
+                uber_string += (ub + ": " + uber_array[ud][ub] + "--> ");
+            }
+
+            session.send(uber_string);
         }
 
         session.endDialog();

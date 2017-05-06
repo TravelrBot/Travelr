@@ -166,7 +166,7 @@ bot.dialog('/waterfall', [
 
         var Key = "&key=AIzaSyDQmIfhoqmGszLRkinJi7mD7SEWt2bQFv8";
 
-        var Zoom = "zoom=15";
+        var Zoom = "zoom=12";
 
         var Size = "&size=640x640";
 

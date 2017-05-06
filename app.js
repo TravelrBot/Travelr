@@ -190,7 +190,7 @@ bot.dialog('/waterfall', [
         }]);
 
         // Send the message
-        session.endDialog(msg);
+        session.send(msg);
 
         next();
     },

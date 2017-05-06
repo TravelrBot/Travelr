@@ -3,7 +3,7 @@ var builder = require('botbuilder');
 var request = require('request');
 var Uber = require('node-uber');
 var googleMapsClient = require('@google/maps').createClient({
-    key: process.env.GOOGLE_MAPS_KEY
+    key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' //process.env.GOOGLE_MAPS_KEY
 });
 
 // Setup Restify Server
@@ -73,9 +73,7 @@ bot.dialog('/waterfall', [
 
     // send the intro
     function (session, args, next){
-        session.send("Hello and welcome to Travelr! Just tell \
-        us where you are going and we will get you there as quickly as \
-        possible!");
+        session.send("Hello and welcome to Travelr! Just tell us where you are going and we will get you there as quickly as possible!");
         next();
     },
 
@@ -155,6 +153,49 @@ bot.dialog('/waterfall', [
             next();
         }, 2000);
     },
+
+//=========================================================
+// Map information 
+//=========================================================
+
+    // Get the map data and sent it to the user
+    function(session, args, next)
+    {
+
+        var MainUrl = "https://maps.googleapis.com/maps/api/staticmap?";
+
+        var Key = "&key=AIzaSyDQmIfhoqmGszLRkinJi7mD7SEWt2bQFv8";
+
+        var Zoom = "zoom=15";
+
+        var Size = "&size=640x640";
+
+        var Format = "&format=gif";
+
+        var MarkerStyleStart = "&markers=color:red|label:A|" + session.userData.start_lat + "," + session.userData.start_long;  
+
+        var MarkerStyleEnd = "&markers=color:red|label:B|" + session.userData.end_lat + "," + session.userData.end_long; 
+
+        var Path = "&path=color:blue|" + session.userData.start_lat + "," + session.userData.start_long + "|" + session.userData.end_lat + "," + session.userData.end_long;
+
+        var Query = MainUrl + Zoom + Size + Format + MarkerStyleStart + MarkerStyleEnd + Path + Key; 
+
+        session.send("Here is a map of your locations");
+
+        // Build the new message 
+        var msg = new builder.Message(session)
+        .attachments([{
+            contentType: "image/gif",
+            contentUrl: Query
+        }]);
+
+        // Send the message
+        session.endDialog(msg);
+
+        next();
+    },
+
+
 //=========================================================
 // Google transit information 
 //=========================================================
@@ -320,9 +361,9 @@ bot.dialog('/waterfall', [
 
         // initialize an uber object
         var uber = new Uber({
-            client_id: process.env.UBER_APP_ID,
-            client_secret: process.env.UBER_APP_PASSWORD,
-            server_token: process.env.UBER_APP_TOKEN,
+            client_id: '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP', //process.env.UBER_APP_ID,
+            client_secret: 'vAy-juG54SV15yiv7hsDgVMegvMDPbjbtuayZ48a' ,//process.env.UBER_APP_PASSWORD,
+            server_token: '2By_BZgRZCMelkCHxVyWUCcTg1z6UfkPfo7UZM6O' , //process.env.UBER_APP_TOKEN,
             redirect_uri: '',
             name: 'TravelrApp',
         });
@@ -465,8 +506,8 @@ bot.dialog('/waterfall', [
             headers: headers,
             body: dataString,
             auth: {
-                'user': process.env.LYFT_APP_ID,
-                'pass': process.env.LYFT_APP_PASSWORD
+                'user': '9LHHn1wknlgs', //process.env.LYFT_APP_ID,
+                'pass': '9Jz-WN7J3dMoVFcMhw9wGtVcDg1fK1gV' //process.env.LYFT_APP_PASSWORD
             }
         };
 

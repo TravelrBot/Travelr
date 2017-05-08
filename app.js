@@ -162,19 +162,89 @@ bot.dialog('/waterfall', [
     function(session, args, next)
     {
 
+        // pull down the lats and long
+        var start_lat = session.userData.start_lat;
+        var end_lat = session.userData.end_lat;
+        var start_long = session.userData.start_long;
+        var end_long = session.userData.end_long
+
         var MainUrl = "https://maps.googleapis.com/maps/api/staticmap?";
 
         var Key = "&key=AIzaSyDQmIfhoqmGszLRkinJi7mD7SEWt2bQFv8";
 
-        var Zoom = "zoom=12";
+        // place holder value for zoom level
+        var intZoom;
+
+        // Check for zoom level
+        // Inital check for lats that are short 
+        if (Math.abs(start_lat - end_lat) <= 0.1)
+        {
+            if (Math.abs(start_long - end_long) <= 0.1)
+            {
+                intZoom = 16;
+            }
+            
+            else if (Math.abs(start_long - end_long) <= 0.5)
+            {
+                intZoom = 15;
+            }
+
+            else if (Math.abs(start_long - end_long) <= 1)
+            {
+                intZoom = 12;
+            }
+
+            else
+            {
+                intZoom = 8;
+            }
+
+        }
+
+        else if (Math.abs(start_lat - end_lat) > .1 && Math.abs(start_lat - end_lat) <= .5)
+        {
+            else if (Math.abs(start_long - end_long) <= 0.1)
+            {
+                intZoom = 14;
+            }
+            
+            else if (Math.abs(start_long - end_long) <= 0.5)
+            {
+                intZoom = 12;
+            }
+
+            else if (Math.abs(start_long - end_long) <= 1)
+            {
+                intZoom = 10;
+            }
+
+            else
+            {
+                intZoom = 8;
+            }
+        }
+
+        else if (Math.abs(start_lat - end_lat) > .5 && Math.abs(start_lat - end_lat) <= 1)
+        {
+            intZoom = 10;
+        }
+
+        else 
+        {
+            intZoom = 8;
+        }
+
+        
+
+        var Zoom = "zoom=" + intZoom.toString();
 
         var Size = "&size=640x640";
 
         var Format = "&format=gif";
 
-        var MarkerStyleStart = "&markers=color:red|label:A|" + session.userData.start_lat + "," + session.userData.start_long;  
+        var MarkerStyleStart = "&markers=color:red|label:A|" + start_lat + "," + start_long;  
 
-        var MarkerStyleEnd = "&markers=color:red|label:B|" + session.userData.end_lat + "," + session.userData.end_long; 
+        var MarkerStyleEnd = "&markers=color:red|label:B|" + end_lat + "," + end_long; 
 
         var Path = "&path=color:blue|" + session.userData.start_lat + "," + session.userData.start_long + "|" + session.userData.end_lat + "," + session.userData.end_long;
 

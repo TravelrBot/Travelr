@@ -203,7 +203,7 @@ bot.dialog('/waterfall', [
 
         else if (Math.abs(start_lat - end_lat) > .1 && Math.abs(start_lat - end_lat) <= .5)
         {
-            else if (Math.abs(start_long - end_long) <= 0.1)
+            if (Math.abs(start_long - end_long) <= 0.1)
             {
                 intZoom = 14;
             }
@@ -234,7 +234,7 @@ bot.dialog('/waterfall', [
             intZoom = 8;
         }
 
-        
+
 
         var Zoom = "zoom=" + intZoom.toString();
 

@@ -763,7 +763,7 @@ bot.dialog('/waterfall', [
 
         setTimeout(function() {
             builder.Prompts.choice(session, "Want more info? Type the number",
-            "Transit|Rideshare|Carshare|Other");
+            "Transit|Uber|Lyft|Other");
         }, 4000);
         
     },
@@ -772,13 +772,13 @@ bot.dialog('/waterfall', [
     {
         // check to see if results error
 
-        if (results.response.entity.toLowerCase() == "carshare" || 
+        if (results.response.entity.toLowerCase() == "lyft" || 
         results.response.index == 2)
         {
             session.beginDialog('/lyft');
         }
 
-        else if (results.response.entity.toLowerCase() == "rideshare" ||
+        else if (results.response.entity.toLowerCase() == "uber" ||
         results.response.index == 1)
         {
             session.beginDialog('/uber');

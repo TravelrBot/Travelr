@@ -32,5 +32,32 @@ export declare module Uber {
     export interface IProducts {
         products: IProductsInfo[];
     }
+
+    export interface ISelectedRides{
+        display_name: string;
+    }
+
+    export interface IBestOption
+    {
+        uber_name: string;
+        uber_price: number; 
+        uber_travel_time: number;
+        uber_distance: number;
+        uber_driver_time;
+        uber_productId: string;
+    }
+
+     export interface DriverTimeInfo {
+        localized_display_name: string;
+        estimate: number;
+        display_name: string;
+        product_id: string;
+    }
+
+    export interface DriverTime {
+        times: DriverTimeInfo[];
+    }
+
+
 }
 

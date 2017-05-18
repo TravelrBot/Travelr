@@ -5,7 +5,7 @@ import * as googleMaps from "@google/maps";
 import {Uber} from "./Uber";
 
 let googleMapsClient = googleMaps.createClient({
-    key:process.env.GOOGLE_MAPS_KEY
+    key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' //process.env.GOOGLE_MAPS_KEY
 });
 
 // Setup Restify Server
@@ -16,8 +16,8 @@ server.listen(process.env.port || process.env.PORT || 3978, function () {
 
 // Create chat bot 
 let connector: builder.ChatConnector = new builder.ChatConnector({
-    appId: process.env.MICROSOFT_APP_ID,
-    appPassword: process.env.MICROSOFT_APP_PASSWORD
+    appId: 'ff6b4beb-ee93-4e58-87ae-4cdc7d52a67b', //process.env.MICROSOFT_APP_ID,
+    appPassword: '4VGq7jLMxiDxDBwoYefSrfg' //process.env.MICROSOFT_APP_PASSWORD
 });
 
 let bot: builder.UniversalBot = new builder.UniversalBot(connector);
@@ -59,12 +59,9 @@ function HtmlParse (html: string): string
 //=========================================================
 
 bot.dialog('/', new builder.IntentDialog()
-    .matches('lyft', '/lyft')
-    .matches('uber', '/uber')
-    .matches('transit', '/transit')
-    .onDefault('/waterfall'));
+    .onDefault('/'));
 
-bot.dialog('/waterfall', [
+bot.dialog('/', [
 
     // send the intro
     function (session: builder.Session, args: any, next): void{
@@ -431,36 +428,50 @@ bot.dialog('/waterfall', [
         const server_token: string = '2By_BZgRZCMelkCHxVyWUCcTg1z6UfkPfo7UZM6O'; //process.env.UBER_APP_TOKEN,
         const perference: number = session.userData.perference; 
         const group: boolean = session.userData.group;
+        let rides: Uber.ISelectedRides[]
 
         // Send the request for products
         // This is where we will check for seat capcaity and or luxury options
         // This is mainly to exclude certain options, not to include
-        let headers: object =
+        let headers: request.Headers =
         {
             'Authorization': 'Bearer ' + server_token,
             'Content-Type': 'application/json',
             'Accept-Language': 'en_EN'
         }; 
 
-        let options: object = {
+        let options: request.OptionsWithUrl = {
 
             url: 'https://api.uber.com/v1.2/products?latitude=' + start_lat +  '&longitude=' + start_long,
             method: 'GET',
             headers: headers
         }
 
-        request(options, function(error, response, body: Uber.IProducts)
+        request(options, function(error, response, body: Uber.IProducts): void
         {
+            if (error)
+            {
+                // TODO: skip over uber
+                next();
+            }
 
             for (let index: number = 0; index < body.products.length; index++) 
             {
                 let ride: Uber.IProductsInfo = body.products[index];
 
+                if (perference != 2)
+                {
+                    if (ride.display_name == "SELECT" || ride.display_name == "BLACK" || ride.display_name == "SUV")
+                    {
+                        rides.push({display_name: ride.display_name});
+                    }
+                }
+
                 if (group)
                 {
                     if (ride.capacity < 4)
                     {
-                        body.products.splice(index);
+                        rides.push({display_name: ride.display_name});
                         continue;
                     }
                 }
@@ -469,77 +480,146 @@ bot.dialog('/waterfall', [
                 {
                     if (ride.capacity > 4)
                     {
-                        body.products.splice(index);
+                        rides.push({display_name: ride.display_name});
                         continue;
                     }
                 }
+                
+            }
 
-                if (perference != 2)
+            // Send the request for Prices
+            // Set the headers 
+            headers ={
+                'Authorization': 'Bearer ' + server_token,
+                'Content-Type': 'application/json',
+                'Accept-Language': 'en_EN'
+            }
+
+            // Set the options 
+            options = {
+                url: 'https://api.uber.com/v1.2/estimates/price?start_latitude=' + start_lat + '&start_longitude=' + start_long + '&end_latitude=' + end_lat + '&end_longitude=' + end_long,
+                method: 'GET',
+                headers: headers
+            };
+
+            // Make the request 
+            request(options, function(error, response, body: Uber.IUberPrices)
+            {
+                let product: Uber.IUberProductPrices[];
+
+                // Set variables to hold the infomration
+                let uber_price: number;
+                let best_uber_option: Uber.IBestOption;
+
+                // Check to see if error 
+                if (error)
                 {
-                    if (ride.display_name == "SELECT" || ride.display_name == "BLACK" || ride.display_name == "SUV")
+                    // Log the error
+                    console.log(error);
+
+                    // TODO: Set a flag to not compare Uber informaiton
+                }
+
+                else
+                {
+                    // Loop through each ride and match with product information 
+                    for (let index: number = 0; index < body.prices.length; index++)
                     {
-                        body.products.splice(index);
-                        continue;
+                        let ride: Uber.IUberProductPrices = body.prices[index];
+
+                        // Check to see if the product matches the terms already
+                        for (let e: number = 0; e < rides.length; e++)
+                        {
+                            if (ride.display_name == rides[e].display_name)
+                            {
+                                // Add the price info to the product array
+                                product.push(ride);
+                            }
+                        }
+                        
+                    }
+
+                    // Now compare and find the cheapest price 
+                    for (let index: number = 0; index < product.length; index++)
+                    {
+                        // Create a holding variable
+                        let ride: Uber.IUberProductPrices = product[index];
+
+                        // If index is 0 set the base price to that index
+                        if (index == 0)
+                        {
+                            // Change the pricing informaiton
+                            uber_price = ride.high_estimate;
+
+                            // Set the variable
+                            best_uber_option = {
+
+                                uber_distance: parseFloat(ride.display_name), 
+                                uber_driver_time: 0,
+                                uber_name: ride.display_name,
+                                uber_price: (ride.high_estimate + ride.low_estimate)/2,
+                                uber_productId: ride.product_id,
+                                uber_travel_time: ride.duration
+                            }
+                        }
+
+                        if (uber_price > ride.high_estimate)
+                        {
+                            uber_price = ride.high_estimate;
+
+                            // Set the variable
+                            best_uber_option = {
+
+                                uber_distance: parseFloat(ride.display_name), 
+                                uber_driver_time: 0,
+                                uber_name: ride.display_name,
+                                uber_price: (ride.high_estimate + ride.low_estimate)/2,
+                                uber_productId: ride.product_id,
+                                uber_travel_time: ride.duration
+                            }
+                        }
                     }
                 }
-                
-            }
 
+                // Send the request for Times
+                // Set the headers 
+                headers ={
+                    'Authorization': 'Bearer ' + server_token,
+                    'Content-Type': 'application/json',
+                    'Accept-Language': 'en_EN'
+                };
 
-        });
-                
-        // Send the request for Prices
-        // Set the headers 
-        headers ={
-            'Authorization': 'Bearer ' + server_token,
-            'Content-Type': 'application/json',
-            'Accept-Language': 'en_EN'
-        }
+                // Set the options 
+                options  = {
+                    url: 'https://api.uber.com/v1.2/estimates/time?start_latitude=' + start_lat + '&start_longitude=' + start_long + '&product_id=' + best_uber_option.uber_productId,
+                    method: 'GET',
+                    headers: headers
+                };
 
-        // Set the options 
-        options = {
-            url: 'https://api.uber.com/v1.2/products?latitude=' + start_lat +  '&longitude=' + start_long,
-            method: 'GET',
-            headers: headers
-        };
-
-        // Make the request 
-        request(options, function(error, response, body: Uber.IUberPrices)
-        {
-
-            // Set variables to hold the infomration
-            let uber_name: string;
-            let uber_price: string; 
-            let uber_travel_time: number;
-            let uber_distance: number;
-            let uber_driver_time;
-            let uber_productId: string;
-
-            // Check to see if error 
-            if (error)
-            {
-                // Log the error
-                console.log(error);
-
-                // TODO: Set a flag to not compare Uber informaiton
-            }
-
-            else
-            {
-                // If the user cares about value
-                if (session.userData.perference == 0)
+                // Send the request for the time
+                request(options, function(error, response, body: Uber.DriverTime)
                 {
-                    // Create a holding variable for the prices
-                    
-                    body.prices.forEach(ride => {
-                    
-                        
+                    if (error)
+                    {
+                        console.log(error); 
 
-                    });
-                }
-                 
-            }
+                        // TODO: Make the error work
+                        // End the task
+                    }
+                    else
+                    {
+                        best_uber_option.uber_driver_time = body.times[0].estimate;
+
+                        // Set the User data
+                        session.userData.Uber = best_uber_option;
+                    }
+                    
+                });
+
+            });
+
         });
+                
 
 //=========================================================
 // Lyft information 

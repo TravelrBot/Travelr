@@ -11,6 +11,7 @@
   "dependencies": {
     "@google/maps": "^0.3.1",
     "@types/node": "^7.0.18",
+    "@types/request": "0.0.43",
     "@types/restify": "^4.3.1",
     "botbuilder": "^3.7.0",
     "node-uber": "^1.0.0",

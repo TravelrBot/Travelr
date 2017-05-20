@@ -457,11 +457,10 @@ bot.dialog('/', [
 
 
             let body: Uber.IProducts = JSON.parse(info);
+            console.log("Got Uber Product info");
 
             for (let index: number = 0; index < body.products.length; index++) 
             {
-                console.log("Got Uber Product info");
-
                 let ride: Uber.IProductsInfo = body.products[index];
 
                 if (perference != 2)
@@ -642,7 +641,7 @@ bot.dialog('/', [
 
             });
 
-            console.log("Finished Google Maps");
+            console.log("Finished Uber Products Maps");
 
         });
                 
@@ -650,7 +649,30 @@ bot.dialog('/', [
 //=========================================================
 // Lyft information 
 //=========================================================
+        console.log("In Lyft");
 
+        let lyftHeaders: request.Headers = 
+        {
+            'Authorization': 'Bearer gAAAAABYw0rkJ3ukCF7xG_88XPPRK0fguyi2Ub2RF2gOnwcY7z8bQYflrhwkh24c3OsHAfBtH0Xbb8r-VQxmk8y01BBl-SymiBE8Lz0wlkG5Sa2VdQUo86AP1ncyRpGKQ_rYc66jfExJ_m1bpEaotykPMVNZzrObZ0JVEBdPRbDhZ4dXLbIQ_l4='
+        };
+
+        let lyftOptions: request.OptionsWithUrl = 
+        {
+            url: 'https://api.lyft.com/v1/ridetypes?lat=' + start_lat + '&lng=' + start_long,
+            headers: headers
+        }
+
+        // Send the request to lyft for products
+        request(lyftOptions, function(error, response, info: string)
+        {
+            if (error)
+            {
+                console.log(error);
+                next();
+            }
+
+            let body: 
+        })
 //=========================================================
 // Car2Go information 
 //=========================================================

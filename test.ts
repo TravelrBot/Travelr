@@ -2,9 +2,9 @@ import * as builder from "botbuilder";
 import * as restify from "restify";
 import * as request from "request";
 import * as googleMaps from "@google/maps";
-import {Uber} from "./Uber";
+import {Uber} from "./uber";
 
-let googleMapsClient = googleMaps.createClient({
+let googleMapsClient: any = googleMaps.createClient({
     key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' //process.env.GOOGLE_MAPS_KEY
 });
 
@@ -16,8 +16,8 @@ server.listen(process.env.port || process.env.PORT || 3978, function () {
 
 // Create chat bot 
 let connector: builder.ChatConnector = new builder.ChatConnector({
-    appId: 'ff6b4beb-ee93-4e58-87ae-4cdc7d52a67b', //process.env.MICROSOFT_APP_ID,
-    appPassword: '4VGq7jLMxiDxDBwoYefSrfg' //process.env.MICROSOFT_APP_PASSWORD
+    appId: "",//'ff6b4beb-ee93-4e58-87ae-4cdc7d52a67b', //process.env.MICROSOFT_APP_ID,
+    appPassword: ""//'4VGq7jLMxiDxDBwoYefSrfg' //process.env.MICROSOFT_APP_PASSWORD
 });
 
 let bot: builder.UniversalBot = new builder.UniversalBot(connector);
@@ -58,13 +58,10 @@ function HtmlParse (html: string): string
 // Bots Dialogs
 //=========================================================
 
-bot.dialog('/', new builder.IntentDialog()
-    .onDefault('/'));
-
 bot.dialog('/', [
 
     // send the intro
-    function (session: builder.Session, args: any, next): void{
+    function (session: builder.Session, args: any, next: any): void{
         session.send("Hello and welcome to Travelr! We just need a few details to get you to your destination!");
         next();
     },
@@ -118,6 +115,9 @@ bot.dialog('/', [
                 session.userData.group = true;
                 break;
         }
+
+        // Go to the next step
+        next();
     },
 
     // get the user's starting location
@@ -130,7 +130,7 @@ bot.dialog('/', [
 //=========================================================
 
     // save the result 
-    function (session: builder.Session, result:builder.IPromptTextResult, next): void
+    function (session: builder.Session, result:builder.IPromptTextResult, next: any): void
     {
         session.userData.start = result.response;
 
@@ -331,7 +331,7 @@ bot.dialog('/', [
                             HtmlParse(legs.steps[0].html_instructions) );
 
                             let g: any;
-                            let google_array: any[];
+                            let google_array: any[] = [];
 
                             for (g in legs.steps[0].steps)
                             {
@@ -356,7 +356,7 @@ bot.dialog('/', [
 
                             let q: string;
                             let r: string;
-                            let google_array: any[];
+                            let google_array: any[] = [];
 
                             // Get the information from google
                             for (q in legs.steps)
@@ -425,17 +425,17 @@ bot.dialog('/', [
         // Set all of the constants
         const client_id: string =  '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP'; //process.env.UBER_APP_ID,
         const client_secret: string = 'vAy-juG54SV15yiv7hsDgVMegvMDPbjbtuayZ48a';//process.env.UBER_APP_PASSWORD,
-        const server_token: string = '2By_BZgRZCMelkCHxVyWUCcTg1z6UfkPfo7UZM6O'; //process.env.UBER_APP_TOKEN,
+        let server_token: string = 'CSQlbbbn6k0gbYZULEqiLk0cwUy03ZIPkIYxPrOs'; //process.env.UBER_APP_TOKEN,
         const perference: number = session.userData.perference; 
         const group: boolean = session.userData.group;
-        let rides: Uber.ISelectedRides[]
+        let rides: Uber.ISelectedRides[] = [];
 
         // Send the request for products
         // This is where we will check for seat capcaity and or luxury options
         // This is mainly to exclude certain options, not to include
         let headers: request.Headers =
         {
-            'Authorization': 'Bearer ' + server_token,
+            'Authorization': 'Token ' + server_token,
             'Content-Type': 'application/json',
             'Accept-Language': 'en_EN'
         }; 
@@ -443,20 +443,25 @@ bot.dialog('/', [
         let options: request.OptionsWithUrl = {
 
             url: 'https://api.uber.com/v1.2/products?latitude=' + start_lat +  '&longitude=' + start_long,
-            method: 'GET',
             headers: headers
         }
 
-        request(options, function(error, response, body: Uber.IProducts): void
+        request(options, function(error, response, info: string): void
         {
             if (error)
             {
                 // TODO: skip over uber
+                console.log("Error when getting uber info")
                 next();
             }
 
+
+            let body: Uber.IProducts = JSON.parse(info);
+
             for (let index: number = 0; index < body.products.length; index++) 
             {
+                console.log("Got Uber Product info");
+
                 let ride: Uber.IProductsInfo = body.products[index];
 
                 if (perference != 2)
@@ -490,7 +495,7 @@ bot.dialog('/', [
             // Send the request for Prices
             // Set the headers 
             headers ={
-                'Authorization': 'Bearer ' + server_token,
+                'Authorization': 'Token ' + server_token,
                 'Content-Type': 'application/json',
                 'Accept-Language': 'en_EN'
             }
@@ -503,13 +508,22 @@ bot.dialog('/', [
             };
 
             // Make the request 
-            request(options, function(error, response, body: Uber.IUberPrices)
+            request(options, function(error, response, info: string)
             {
-                let product: Uber.IUberProductPrices[];
+                let body: Uber.IUberPrices = JSON.parse(info);
+                let product: Uber.IUberProductPrices[] = [];
 
                 // Set variables to hold the infomration
-                let uber_price: number;
-                let best_uber_option: Uber.IBestOption;
+                let uber_price: number = 99999;
+                let best_uber_option: Uber.IBestOption = 
+                {
+                    uber_distance: 0,
+                    uber_driver_time: 0, 
+                    uber_name: "",
+                    uber_price: 0,
+                    uber_productId: "",
+                    uber_travel_time: 0
+                };
 
                 // Check to see if error 
                 if (error)
@@ -522,6 +536,8 @@ bot.dialog('/', [
 
                 else
                 {
+                    console.log("Have Uber prices");
+
                     // Loop through each ride and match with product information 
                     for (let index: number = 0; index < body.prices.length; index++)
                     {
@@ -584,7 +600,7 @@ bot.dialog('/', [
                 // Send the request for Times
                 // Set the headers 
                 headers ={
-                    'Authorization': 'Bearer ' + server_token,
+                    'Authorization': 'Token ' + server_token,
                     'Content-Type': 'application/json',
                     'Accept-Language': 'en_EN'
                 };
@@ -597,7 +613,7 @@ bot.dialog('/', [
                 };
 
                 // Send the request for the time
-                request(options, function(error, response, body: Uber.DriverTime)
+                request(options, function(error, response, info: string)
                 {
                     if (error)
                     {
@@ -608,15 +624,25 @@ bot.dialog('/', [
                     }
                     else
                     {
+                        console.log("Have driver times");
+
+                        // Parse the string into json
+                        let body: Uber.DriverTime = JSON.parse(info);
+
                         best_uber_option.uber_driver_time = body.times[0].estimate;
 
                         // Set the User data
                         session.userData.Uber = best_uber_option;
                     }
                     
+                    console.log("Finished Uber Driver Time");
                 });
 
+                console.log("Finished Uber Price");
+
             });
+
+            console.log("Finished Google Maps");
 
         });
                 
@@ -632,7 +658,7 @@ bot.dialog('/', [
 //=========================================================
 // Match with user perferences 
 //=========================================================
-        
+        console.log("Finished");
     }
 
     ])  

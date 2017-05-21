@@ -3,6 +3,7 @@ import * as restify from "restify";
 import * as request from "request";
 import * as googleMaps from "@google/maps";
 import {Uber} from "./uber";
+import {Lyft} from "./lyft";
 
 let googleMapsClient: any = googleMaps.createClient({
     key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' //process.env.GOOGLE_MAPS_KEY
@@ -463,7 +464,7 @@ bot.dialog('/', [
             {
                 let ride: Uber.IProductsInfo = body.products[index];
 
-                if (perference != 2)
+                if (perference == 2)
                 {
                     if (ride.display_name == "SELECT" || ride.display_name == "BLACK" || ride.display_name == "SUV")
                     {
@@ -473,7 +474,7 @@ bot.dialog('/', [
 
                 if (group)
                 {
-                    if (ride.capacity < 4)
+                    if (ride.capacity > 4)
                     {
                         rides.push({display_name: ride.display_name});
                         continue;
@@ -482,7 +483,7 @@ bot.dialog('/', [
 
                 if (!group)
                 {
-                    if (ride.capacity > 4)
+                    if (ride.capacity < 4)
                     {
                         rides.push({display_name: ride.display_name});
                         continue;
@@ -594,48 +595,48 @@ bot.dialog('/', [
                             }
                         }
                     }
+
+                    // Send the request for Times
+                    // Set the headers 
+                    headers ={
+                        'Authorization': 'Token ' + server_token,
+                        'Content-Type': 'application/json',
+                        'Accept-Language': 'en_EN'
+                    };
+
+                    // Set the options 
+                    options  = {
+                        url: 'https://api.uber.com/v1.2/estimates/time?start_latitude=' + start_lat + '&start_longitude=' + start_long + '&product_id=' + best_uber_option.uber_productId,
+                        method: 'GET',
+                        headers: headers
+                    };
+
+                    // Send the request for the time
+                    request(options, function(error, response, info: string)
+                    {
+                        if (error)
+                        {
+                            console.log(error); 
+
+                            // TODO: Make the error work
+                            // End the task
+                        }
+                        else
+                        {
+                            console.log("Have driver times");
+
+                            // Parse the string into json
+                            let body: Uber.DriverTime = JSON.parse(info);
+
+                            best_uber_option.uber_driver_time = body.times[0].estimate;
+
+                            // Set the User data
+                            session.userData.Uber = best_uber_option;
+                        }
+                        
+                        console.log("Finished Uber Driver Time");
+                    });
                 }
-
-                // Send the request for Times
-                // Set the headers 
-                headers ={
-                    'Authorization': 'Token ' + server_token,
-                    'Content-Type': 'application/json',
-                    'Accept-Language': 'en_EN'
-                };
-
-                // Set the options 
-                options  = {
-                    url: 'https://api.uber.com/v1.2/estimates/time?start_latitude=' + start_lat + '&start_longitude=' + start_long + '&product_id=' + best_uber_option.uber_productId,
-                    method: 'GET',
-                    headers: headers
-                };
-
-                // Send the request for the time
-                request(options, function(error, response, info: string)
-                {
-                    if (error)
-                    {
-                        console.log(error); 
-
-                        // TODO: Make the error work
-                        // End the task
-                    }
-                    else
-                    {
-                        console.log("Have driver times");
-
-                        // Parse the string into json
-                        let body: Uber.DriverTime = JSON.parse(info);
-
-                        best_uber_option.uber_driver_time = body.times[0].estimate;
-
-                        // Set the User data
-                        session.userData.Uber = best_uber_option;
-                    }
-                    
-                    console.log("Finished Uber Driver Time");
-                });
 
                 console.log("Finished Uber Price");
 
@@ -651,19 +652,30 @@ bot.dialog('/', [
 //=========================================================
         console.log("In Lyft");
 
+        // Declare the constants
+        let lyftClientId: string = 'gAAAAABZIPjkPxmPgs83bWslOmxyt26-4AFcNDYZOwXWj4gyu7NEjddtxNK0DeNOqRrIsOCjKF-16_NiqApbMT-5vtGXJaulRmRk6b6QqDpYyU0MGYojno-FKnn58KzWRPwfoqFF8MUA5LTP0FpoNScafNXOeSgdic1eWsoGQm6Kg5c7TyQviRQ=';
+
         let lyftHeaders: request.Headers = 
         {
-            'Authorization': 'Bearer gAAAAABYw0rkJ3ukCF7xG_88XPPRK0fguyi2Ub2RF2gOnwcY7z8bQYflrhwkh24c3OsHAfBtH0Xbb8r-VQxmk8y01BBl-SymiBE8Lz0wlkG5Sa2VdQUo86AP1ncyRpGKQ_rYc66jfExJ_m1bpEaotykPMVNZzrObZ0JVEBdPRbDhZ4dXLbIQ_l4='
+            'Authorization': 'bearer ' + lyftClientId
         };
 
         let lyftOptions: request.OptionsWithUrl = 
         {
             url: 'https://api.lyft.com/v1/ridetypes?lat=' + start_lat + '&lng=' + start_long,
-            headers: headers
+            headers: lyftHeaders
         }
 
+        // Holds the type of rides that fits the user profile
+        // Luxury and Group
+        let lyftRideTypes: Lyft.ISelectedRideTypes[] = [];
+
+        // Hold the Rides that fit the time 
+        let lyftRides: Lyft.IRideEstimate[] = [];
+
         // Send the request to lyft for products
-        request(lyftOptions, function(error, response, info: string)
+        // Find the best value
+        request(lyftOptions, function(error, response, info: any)
         {
             if (error)
             {
@@ -671,8 +683,193 @@ bot.dialog('/', [
                 next();
             }
 
-            let body: 
-        })
+            console.log("In lyft Ride Types");
+
+            let body: Lyft.IAllRideTypes = JSON.parse(info);
+
+
+            for (let index: number = 0; index < body.ride_types.length; index++)
+            {
+                let ride: Lyft.IRideTypeInfo = body.ride_types[index];
+
+                if (perference == 2)
+                {
+                    if (ride.display_name != "Lyft Line") 
+                    {
+                        lyftRideTypes.push({
+                            ride_type: ride.ride_type,
+                            display_name: ride.display_name
+                        });
+                    }
+                }
+
+                if (group)
+                {
+                    if (ride.seats > 4)
+                    {
+                        lyftRideTypes.push({
+                            ride_type: ride.ride_type,
+                            display_name: ride.display_name
+                        });
+                        continue;
+                    }
+                }
+
+                if (!group)
+                {
+                    if (ride.seats < 4)
+                    {
+                        lyftRideTypes.push({
+                            ride_type: ride.ride_type,
+                            display_name: ride.display_name
+                        });
+                        continue;
+                    }
+                }
+            }
+
+            // Send the new request for Ride Pricing
+            let lyftHeaders: request.Headers = 
+            {
+                'Authorization': 'bearer ' + lyftClientId
+            };
+
+            let lyftOptions: request.OptionsWithUrl = 
+            {
+                url: 'https://api.lyft.com/v1/cost?start_lat='+ start_lat + '&start_lng=' + start_long + '&end_lat=' + end_lat + '&end_lng=' + end_long,
+                headers: lyftHeaders
+            }
+
+            // Send the request
+            request(lyftOptions, function(error, response, info:string)
+            {
+                if (error)
+                {   
+                    console.log(error);
+                    // TODO
+                }
+
+                else
+                {   
+                    console.log("Have lyft prices");
+
+                    let body: Lyft.IAllEstimates = JSON.parse(info);
+
+                    // Lyft prices
+                    let lyft_price: number = 99999;
+                    let best_lyft_option: Lyft.IBestLyftOption = 
+                    {
+                        ride_type: "",
+                        estimated_duration_seconds: 0,
+                        estimated_distance_miles: 0,
+                        estimated_cost_cents_max: 0,
+                        primetime_percentage: "",
+                        estimated_cost_cents_min: 0,
+                        display_name: "", 
+                        driver_time: 0
+                    };
+
+                    // Loop through each ride and match with previous information
+                    for (let index: number = 0; index < body.cost_estimates.length; index++)
+                    {
+                        let ride: Lyft.IRideEstimate = body.cost_estimates[index];
+
+                        // Check to see if it matches the one based on group and luxury
+                        for (let e: number = 0; e < lyftRideTypes.length; e++)
+                        {
+                            if (ride.display_name == lyftRideTypes[e].display_name)
+                            {
+                                // add the price infor to the product array 
+                                lyftRides.push(ride);
+                            }
+                        }
+                    }
+
+                    // Compares and find the cheapest price 
+                    for (let index: number = 0; index < lyftRides.length; index++)
+                    {
+                        // Holding variable to reference the ride
+                        let ride: Lyft.IRideEstimate = lyftRides[index];
+
+                        // If index = 0 set the initial info to that
+                        if (index == 0)
+                        {
+                            lyft_price = ride.estimated_cost_cents_max;
+                            best_lyft_option = {
+                                display_name: ride.display_name,
+                                estimated_cost_cents_max: ride.estimated_cost_cents_max,
+                                estimated_cost_cents_min: ride.estimated_cost_cents_min,
+                                estimated_distance_miles: ride.estimated_distance_miles,
+                                estimated_duration_seconds: ride.estimated_duration_seconds,
+                                primetime_percentage: ride.primetime_percentage,
+                                ride_type: ride.ride_type,
+                                driver_time: 0
+                            }
+                        } 
+
+                        // If the ride is cheaper than the previous
+                        if (ride.estimated_cost_cents_max < lyft_price)
+                        {
+                            lyft_price = ride.estimated_cost_cents_max;
+                            best_lyft_option = {
+                                display_name: ride.display_name,
+                                estimated_cost_cents_max: ride.estimated_cost_cents_max,
+                                estimated_cost_cents_min: ride.estimated_cost_cents_min,
+                                estimated_distance_miles: ride.estimated_distance_miles,
+                                estimated_duration_seconds: ride.estimated_duration_seconds,
+                                primetime_percentage: ride.primetime_percentage,
+                                ride_type: ride.ride_type,
+                                driver_time: 0
+                            }
+                        }
+                        
+                    }
+
+                    // Send the new request for Driver Times
+                    let lyftHeaders: request.Headers = 
+                    {
+                        'Authorization': 'bearer ' + lyftClientId
+                    };
+
+                    let lyftOptions: request.OptionsWithUrl = 
+                    {
+                        url: 'https://api.lyft.com/v1/eta?lat=' + start_lat + '&lng=' + start_long + '&ride_type=' + best_lyft_option.ride_type,
+                        headers: lyftHeaders
+                    }
+
+                    // Send the request for Driver times
+                    request(lyftOptions, function(error, response, info: string)
+                    {
+                        if (error)
+                        {
+                            console.log(error);
+                            // TODO
+                        }
+                        
+                        else
+                        {
+                            // Parse the JSON
+                            let body: Lyft.AllEtas = JSON.parse(info);
+
+                            // Set the Driver time
+                            best_lyft_option.driver_time = body.eta_estimates[0].eta_seconds;
+
+                            // Save the info to user data
+                            session.userData.Lyft = best_lyft_option;
+                            
+                        }
+
+                        console.log("Finished Lyft Time");
+                        
+                    });
+
+                }
+                
+                console.log("Finished Lyft Price");
+            });
+
+            console.log("Finished All of Lyft");
+        });
 //=========================================================
 // Car2Go information 
 //=========================================================
@@ -681,6 +878,6 @@ bot.dialog('/', [
 // Match with user perferences 
 //=========================================================
         console.log("Finished");
-    }
+    },
 
     ])  

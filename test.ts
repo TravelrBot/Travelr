@@ -275,6 +275,9 @@ bot.dialog('/', [
         const end_lat: string = session.userData.end_lat;
         const start_long: string = session.userData.start_long;
         const end_long: string = session.userData.end_long; 
+        let transitFlag: boolean = true;
+        let uberFlag: boolean = true;
+        let lyftFlag: boolean = true;
 
 //=========================================================
 // Google Transit
@@ -327,7 +330,7 @@ bot.dialog('/', [
                         {
                             console.log("Only 1 step");
 
-                            session.send('Transit -> Distance: ' + (legs.distance.text) +
+                            session.userData.Transit = ('Transit -> Distance: ' + (legs.distance.text) +
                             'Duration: ' + (legs.duration.text) + 
                             HtmlParse(legs.steps[0].html_instructions) );
 
@@ -349,7 +352,7 @@ bot.dialog('/', [
                             console.log("Multiple Steps");
 
                             // send the depart time 
-                            session.send("Transit -> Depart Time: " + 
+                            session.userData.Transit = ("Transit -> Depart Time: " + 
                             legs.departure_time.text + " " + "Arrival Time: " + 
                             legs.arrival_time.text + " " + "Total Time: " + 
                             legs.duration.text + " " + "Total Distance: " + 
@@ -411,6 +414,7 @@ bot.dialog('/', [
 
                             // save the transit information
                             session.userData.google_array = google_array;
+                            transitFlag = false;
                         }
                     }
                 }
@@ -633,7 +637,7 @@ bot.dialog('/', [
                             // Set the User data
                             session.userData.Uber = best_uber_option;
                         }
-                        
+                        uberFlag = false;
                         console.log("Finished Uber Driver Time");
                     });
                 }
@@ -717,7 +721,7 @@ bot.dialog('/', [
 
                 if (!group)
                 {
-                    if (ride.seats < 4)
+                    if (ride.seats < 5)
                     {
                         lyftRideTypes.push({
                             ride_type: ride.ride_type,
@@ -858,7 +862,7 @@ bot.dialog('/', [
                             session.userData.Lyft = best_lyft_option;
                             
                         }
-
+                        lyftFlag = false;
                         console.log("Finished Lyft Time");
                         
                     });
@@ -874,10 +878,59 @@ bot.dialog('/', [
 // Car2Go information 
 //=========================================================
 
+
+        console.log("Finished");
+        do {
+            setTimeout(function() {
+                
+            }, 100);
+        } while (!transitFlag || !uberFlag || !lyftFlag);
+
+        next();
+    },
 //=========================================================
 // Match with user perferences 
 //=========================================================
-        console.log("Finished");
-    },
+    function (session: builder.Session, response: any, next: Function)
+    {
+        console.log("Matching with user preference");
+
+        // Grab the user preference
+        let preference: number = session.userData.perference;
+
+        // Grab the infomation
+        let uber: Uber.IBestOption = session.userData.Uber;
+        let lyft: Lyft.IBestLyftOption = session.userData.Lyft;
+        let transitInfo = session.userData.Transit;
+        let transitSteps = session.userData.google_array;
+
+        console.log(uber);
+        console.log();
+        console.log(lyft);
+        console.log();
+        console.log(transitInfo);
+        console.log();
+        console.log(transitSteps);
+        console.log();
+
+        // If the preference is for value
+        if (preference == 0)
+        {
+
+        }
+
+        // If preference is for time0
+        if (preference == 1)
+        {
+
+        }
+
+        // Preference is for luxury
+        if (preference == 2)
+        {
+
+        }
+
+    }
 
     ])  

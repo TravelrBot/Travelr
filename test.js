@@ -7,7 +7,7 @@ const googleMaps = require("@google/maps");
 let googleMapsClient = googleMaps.createClient({
     key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4'
 });
-    // Setup Restify Server
+// Setup Restify Server
     var server = restify.createServer();
     server.listen(process.env.port || process.env.PORT || 3978, function () {
         console.log('%s listening to %s', server.name, server.url);
@@ -40,6 +40,18 @@ let googleMapsClient = googleMaps.createClient({
         }
         return (html_return.replace(/  /g, " ").trim());
     }
+    var Checker = function Timeout(transit, uber, lyft, next) {
+        if (!transit && !uber && !lyft) {
+            // Go to the aggregations
+            next();
+        }
+        else {
+            setTimeout(function () {
+                console.log("Waiting for information");
+                Timeout(transit, uber, lyft, next);
+            }, 100);
+        }
+    };
     //=========================================================
     // Bots Dialogs
     //=========================================================
@@ -188,9 +200,9 @@ let googleMapsClient = googleMaps.createClient({
             var end_lat = session.userData.end_lat;
             var start_long = session.userData.start_long;
             var end_long = session.userData.end_long;
-            var transitFlag = true;
-            var uberFlag = true;
-            var lyftFlag = true;
+            var transitFlag = false;
+            var uberFlag = false;
+            var lyftFlag = false;
             //=========================================================
             // Google Transit
             //=========================================================
@@ -221,6 +233,7 @@ let googleMapsClient = googleMaps.createClient({
                     else {
                         console.log("Transit in area");
                         // Get the results 
+
                         var legs = response.json.routes[0].legs[0];
                         // If there is only one step
                         if (legs.steps.length == 1) {
@@ -281,7 +294,7 @@ let googleMapsClient = googleMaps.createClient({
                             }
                             // save the transit information
                             session.userData.google_array = google_array;
-                            transitFlag = false;
+                            transitFlag = true;
                         }
                     }
                 }
@@ -332,7 +345,7 @@ let googleMapsClient = googleMaps.createClient({
                         }
                     }
                     if (!group) {
-                        if (ride.capacity < 4) {
+                        if (ride.capacity < 5) {
                             rides.push({ display_name: ride.display_name });
                             continue;
                         }
@@ -393,7 +406,7 @@ let googleMapsClient = googleMaps.createClient({
                                 uber_price = ride.high_estimate;
                                 // Set the variable
                                 best_uber_option = {
-                                    uber_distance: parseFloat(ride.display_name),
+                                    uber_distance: ride.distance,
                                     uber_driver_time: 0,
                                     uber_name: ride.display_name,
                                     uber_price: (ride.high_estimate + ride.low_estimate) / 2,
@@ -440,7 +453,7 @@ let googleMapsClient = googleMaps.createClient({
                                 // Set the User data
                                 session.userData.Uber = best_uber_option;
                             }
-                            uberFlag = false;
+                            uberFlag = true;
                             console.log("Finished Uber Driver Time");
                         });
                     }
@@ -597,7 +610,7 @@ let googleMapsClient = googleMaps.createClient({
                                 // Save the info to user data
                                 session.userData.Lyft = best_lyft_option_1;
                             }
-                            lyftFlag = false;
+                            lyftFlag = true;
                             console.log("Finished Lyft Time");
                         });
                     }
@@ -609,15 +622,25 @@ let googleMapsClient = googleMaps.createClient({
             // Car2Go information 
             //=========================================================
             console.log("Finished");
-            
-            
-
+            function Timeout(transit, uber, lyft, next) {
+                if (transit && uber && lyft) {
+                    // Go to the aggregations
+                    return next();
+                }
+                else {
+                    setTimeout(function () {
+                        console.log("Waiting for information");
+                        return Timeout(transitFlag, uberFlag, lyftFlag, next);
+                    }, 150);
+                }
+            }
+            ;
+            Timeout(transitFlag, uberFlag, lyftFlag, next);
         },
         //=========================================================
         // Match with user perferences 
         //=========================================================
         function (session, response, next) {
-            
             console.log("Matching with user preference");
             // Grab the user preference
             var preference = session.userData.perference;

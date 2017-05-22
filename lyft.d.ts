@@ -62,9 +62,8 @@ export declare module Lyft
         ride_type: string;
         estimated_duration_seconds: number;
         estimated_distance_miles: number;
-        estimated_cost_cents_max: number;
+        price: number;
         primetime_percentage: string;
-        estimated_cost_cents_min: number;
         display_name: string;
         driver_time: number;
     }

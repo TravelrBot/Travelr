@@ -4,6 +4,7 @@ import * as request from "request";
 import * as googleMaps from "@google/maps";
 import {Uber} from "./uber";
 import {Lyft} from "./lyft";
+import {Results} from "./results";
 
 let googleMapsClient: any = googleMaps.createClient({
     key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' //process.env.GOOGLE_MAPS_KEY
@@ -53,6 +54,22 @@ function HtmlParse (html: string): string
     }
 
     return (html_return.replace(/  /g, " ").trim())
+}
+
+let Checker: Function = function Timeout(transit: boolean, uber: boolean, lyft: boolean, next)
+{
+    if (!transit && !uber && !lyft)
+    {
+        // Go to the aggregations
+        next();
+    }
+    else
+    {
+        setTimeout(function() {
+            console.log("Waiting for information");
+            Timeout(transit, uber, lyft, next);
+        }, 100);
+    }
 }
 
 //=========================================================
@@ -275,42 +292,46 @@ bot.dialog('/', [
         const end_lat: string = session.userData.end_lat;
         const start_long: string = session.userData.start_long;
         const end_long: string = session.userData.end_long; 
-        let transitFlag: boolean = true;
-        let uberFlag: boolean = true;
-        let lyftFlag: boolean = true;
+
+        // Flags for finished api pulls
+        let transitFlag: boolean = false;
+        let uberFlag: boolean = false;
+        let lyftFlag: boolean = false;
 
 //=========================================================
 // Google Transit
 //=========================================================
 
-        googleMapsClient.directions(
-            {
-                origin:
-                {
-                    lat: start_lat,
-                    lng: start_long
-                }, 
-                destination:
-                {
-                    lat: end_lat,
-                    lng: end_long
-                },
-                mode: "transit"
-            },
+        let transitUrl: string = 'https://maps.googleapis.com/maps/api/directions/outputFormat?json';
+        let transitOrigin: string = '&origin=' + start_lat + ',' + start_long;
+        let transitDestination: string = '&destination=' + end_lat + ',' + end_long;
+        let transitMode: string = '&mode=transit';
+        let transitLanguage: string = "&language=en";
+        let transitUnits: string = '&units=imperial';
+        let transitKey: string = "&key=AIzaSyDQmIfhoqmGszLRkinJi7mD7SEWt2bQFv8";
 
-            function(err, response)
+        let transitQuery = transitUrl + transitOrigin + transitDestination + transitMode + transitLanguage + transitUnits + 
+            transitKey;
+
+        // Send the request for transif information
+        request(transitQuery,
+
+            function(error, response, info)
             {
                 // Check if Error
-                if (err)
+                if (error)
                 {
                     // Send a message to indicate error 
-                    console.log(err);
+                    console.log(error);
                     session.send("There was an unknown error getting transit info");
                 }
                 else
                 {   
                     console.log("No error in transit");
 
+                    // Convert the string into json 
+                    let body: any = JSON.parse(info);
+                    
                     // Check to see if there is no results
                     if (response.json.status == "ZERO_RESULTS" || response.json.status == "NOT_FOUND")
                     {
@@ -324,6 +345,10 @@ bot.dialog('/', [
                         
                         // Get the results 
                         let legs: any = response.json.routes[0].legs[0];
+
+                        console.log(response);
+                        console.log(response.json);
+                        console.log(response.json.routes);
 
                         // If there is only one step
                         if (legs.steps.length == 1)
@@ -414,7 +439,7 @@ bot.dialog('/', [
 
                             // save the transit information
                             session.userData.google_array = google_array;
-                            transitFlag = false;
+                            transitFlag = true;
                         }
                     }
                 }
@@ -487,7 +512,7 @@ bot.dialog('/', [
 
                 if (!group)
                 {
-                    if (ride.capacity < 4)
+                    if (ride.capacity < 5)
                     {
                         rides.push({display_name: ride.display_name});
                         continue;
@@ -574,7 +599,7 @@ bot.dialog('/', [
                             // Set the variable
                             best_uber_option = {
 
-                                uber_distance: parseFloat(ride.display_name), 
+                                uber_distance: ride.distance, 
                                 uber_driver_time: 0,
                                 uber_name: ride.display_name,
                                 uber_price: (ride.high_estimate + ride.low_estimate)/2,
@@ -637,7 +662,7 @@ bot.dialog('/', [
                             // Set the User data
                             session.userData.Uber = best_uber_option;
                         }
-                        uberFlag = false;
+                        uberFlag = true;
                         console.log("Finished Uber Driver Time");
                     });
                 }
@@ -766,11 +791,10 @@ bot.dialog('/', [
                         ride_type: "",
                         estimated_duration_seconds: 0,
                         estimated_distance_miles: 0,
-                        estimated_cost_cents_max: 0,
+                        price : 0,
                         primetime_percentage: "",
-                        estimated_cost_cents_min: 0,
-                        display_name: "", 
-                        driver_time: 0
+                        driver_time: 0,
+                        display_name: ""
                     };
 
                     // Loop through each ride and match with previous information
@@ -801,8 +825,7 @@ bot.dialog('/', [
                             lyft_price = ride.estimated_cost_cents_max;
                             best_lyft_option = {
                                 display_name: ride.display_name,
-                                estimated_cost_cents_max: ride.estimated_cost_cents_max,
-                                estimated_cost_cents_min: ride.estimated_cost_cents_min,
+                                price: ((ride.estimated_cost_cents_max + ride.estimated_cost_cents_min) / 120),
                                 estimated_distance_miles: ride.estimated_distance_miles,
                                 estimated_duration_seconds: ride.estimated_duration_seconds,
                                 primetime_percentage: ride.primetime_percentage,
@@ -817,8 +840,7 @@ bot.dialog('/', [
                             lyft_price = ride.estimated_cost_cents_max;
                             best_lyft_option = {
                                 display_name: ride.display_name,
-                                estimated_cost_cents_max: ride.estimated_cost_cents_max,
-                                estimated_cost_cents_min: ride.estimated_cost_cents_min,
+                                price: ((ride.estimated_cost_cents_max + ride.estimated_cost_cents_min) / 120),
                                 estimated_distance_miles: ride.estimated_distance_miles,
                                 estimated_duration_seconds: ride.estimated_duration_seconds,
                                 primetime_percentage: ride.primetime_percentage,
@@ -862,7 +884,7 @@ bot.dialog('/', [
                             session.userData.Lyft = best_lyft_option;
                             
                         }
-                        lyftFlag = false;
+                        lyftFlag = true;
                         console.log("Finished Lyft Time");
                         
                     });
@@ -880,13 +902,20 @@ bot.dialog('/', [
 
 
         console.log("Finished");
-        do {
-            setTimeout(function() {
-                
-            }, 100);
-        } while (!transitFlag || !uberFlag || !lyftFlag);
+        function Timeout(transit: boolean, uber: boolean, lyft: boolean, next: Function) {
+                if (transit && uber && lyft) {
+                    // Go to the aggregations
+                    return next();
+                }
+                else {
+                    setTimeout(function () {
+                        console.log("Waiting for information");
+                        return Timeout(transitFlag, uberFlag, lyftFlag, next);
+                    }, 150);
+                }
+            };
 
-        next();
+            Timeout(transitFlag, uberFlag, lyftFlag, next);
     },
 //=========================================================
 // Match with user perferences 
@@ -901,8 +930,11 @@ bot.dialog('/', [
         // Grab the infomation
         let uber: Uber.IBestOption = session.userData.Uber;
         let lyft: Lyft.IBestLyftOption = session.userData.Lyft;
-        let transitInfo = session.userData.Transit;
-        let transitSteps = session.userData.google_array;
+        let transitInfo: string = session.userData.Transit;
+        let transitSteps: any = session.userData.google_array;
+        let options: Results.IOptions;
+        let transit: Results.ITransit;
+        let rideshare: Results.IRideshare;
 
         console.log(uber);
         console.log();
@@ -916,19 +948,80 @@ bot.dialog('/', [
         // If the preference is for value
         if (preference == 0)
         {
+            let uberPrice: number = uber.uber_price;
+            let lyftPrice: number = lyft.price;
 
+            // Find the lower price
+            if (uberPrice < lyftPrice)
+            {   
+                rideshare=
+                {
+                    driverTime: (uber.uber_driver_time / 60).toPrecision(2),
+                    price : uberPrice.toPrecision(2),
+                    serviceProvider: "Uber",
+                    serviceType : uber.uber_name,
+                    totalDistance : uber.uber_distance.toPrecision(2),
+                    totalTime : (uber.uber_travel_time / 60).toPrecision(2)
+                }
+
+                transit =
+                {
+                    mainInfo: transitInfo,
+                    steps: transitSteps
+                }
+
+                options = 
+                {
+                    rideshare: rideshare,
+                    transit: transit
+                }
+            }
+            else
+            {
+                rideshare =
+                {
+                    driverTime: (lyft.driver_time / 60).toPrecision(2),
+                    price : lyft.price.toPrecision(2),
+                    serviceProvider: "Lyft",
+                    serviceType : lyft.display_name,
+                    totalDistance : lyft.estimated_distance_miles.toPrecision(2),
+                    totalTime : (lyft.estimated_duration_seconds / 60).toPrecision(2)
+                }
+
+                transit =
+                {
+                    mainInfo: transitInfo,
+                    steps: transitSteps
+                }
+
+                options = 
+                {
+                    rideshare: rideshare,
+                    transit: transit
+                }
+            }
         }
 
-        // If preference is for time0
+        // If preference is for time
         if (preference == 1)
         {
+            let uberDriverTime: number = uber.uber_driver_time;
+            let lyftDriverTime: number = lyft.driver_time;
 
+            if (uberDriverTime < lyftDriverTime)
+            {
+
+            }
+            else
+            {
+
+            }
         }
 
         // Preference is for luxury
         if (preference == 2)
         {
-
+            // Use Uber because of lux 
         }
 
     }

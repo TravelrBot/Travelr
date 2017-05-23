@@ -329,12 +329,7 @@ bot.dialog('/', [
                     console.log("No error in transit");
 
                     // Convert the string into json 
-
-                    console.log(info);
-                    console.log("\n\n\n\n\n\n\n\n\n");
                     let body: Transit.IAllTransitInfo = JSON.parse(info);
-
-                    console.log(util.inspect(body, false, null));
 
                     if (body.status != "OK")
                     {
@@ -346,114 +341,117 @@ bot.dialog('/', [
                     {
                         console.log("Transit in area");
                         
-                        // Get the results
                         for (let route_step: number = 0; route_step < body.routes.length; route_step++)
                         {
+                            // Right now there is only 1 route
                             let legs: Transit.ILeg[] = body.routes[route_step].legs;
 
                             // loop through each leg
+                            // Right now there is only 1 leg because there are no waypoints
                             legs.forEach(leg => 
-                            {
-                                    let steps: Transit.IStep[] = leg.steps
-                            });
+                            {   
+                                // Need to make sure that it is not only walking directions    
+                                let transitLegInfo: Transit.IFinalLegInfo;
 
-                        }
-
-                        // If there is only one step
-                        if (legs.steps.length == 1)
-                        {
-                            console.log("Only 1 step");
-
-                            session.userData.Transit = ('Transit -> Distance: ' + (legs.distance.text) +
-                            'Duration: ' + (legs.duration.text) + 
-                            HtmlParse(legs.steps[0].html_instructions) );
-
-                            let g: any;
-                            let google_array: any[] = [];
-
-                            for (g in legs.steps[0].steps)
-                            {
-                                google_array.push(HtmlParse(legs.steps[0].steps[g].html_instructions));
-                            }
-
-                            // Add the google transit information to userdata
-                            session.userData.google_array = google_array;
-                        }
-
-                        // If there is more than 1 step
-                        else
-                        {
-                            console.log("Multiple Steps");
-
-                            // send the depart time 
-                            session.userData.Transit = ("Transit -> Depart Time: " + 
-                            legs.departure_time.text + " " + "Arrival Time: " + 
-                            legs.arrival_time.text + " " + "Total Time: " + 
-                            legs.duration.text + " " + "Total Distance: " + 
-                            legs.distance.text + " ");
-
-                            let q: string;
-                            let r: string;
-                            let google_array: any[] = [];
-
-                            // Get the information from google
-                            for (q in legs.steps)
-                            {
-                                let msg: string = "";
-
-                                if (legs.steps[q].travel_mode == 'WALKING')
+                                if (leg.steps.length == 1)
                                 {
-                                    // log the big instruction 
-                                    msg += (HtmlParse(legs.steps[q].html_instructions));
-                                    msg += "\n";
-
-                                    for (r in legs.steps[q].steps)
-                                    {
-                                        msg += (HtmlParse(legs.steps[q].steps[r].html_instructions));
-                                        msg += '\n';
-                                    }
+                                    let currentTime: number = Date.now()
+                                    let departureTime: number = currentTime
                                     
-                                    // add the string to the array
-                                    google_array.push(msg);
-                                }
+                                    // Google Transit give time value in seconds
+                                    // Muliply by 10 to get milliseconds to add to Date
+                                    let arrivalTime : number = currentTime + (leg.duration.value * 10);
 
+                                    // Convert the times into Date 
+                                    let departureDate: Date = new Date(departureTime);
+                                    let arrivalDate: Date = new Date(arrivalTime);
+
+                                    transitLegInfo = 
+                                    {
+                                        transitArrivalTime: arrivalDate.getHours().toString() + (arrivalDate.getMinutes() < 10 ? ':0' : ':') + arrivalDate.getMinutes().toString(),
+                                        transitDepartureTime: departureDate.getHours() + (departureDate.getMinutes() < 10 ? ":0" : ":") + departureDate.getMinutes(),
+                                        transitDistance: leg.distance.text,
+                                        transitDuration: leg.duration.text,
+                                        transitSteps: [],
+                                    };
+
+                                }
                                 else
                                 {
-                                    // log the main html_instructions
-                                    console.log(legs.steps[q].html_instructions);
-
-                                    msg += (legs.steps[q].html_instructions);
-
-                                    var transit = legs.steps[q].transit_details; 
-
-                                    msg += ("Arrival Stop Name:" + transit.arrival_stop.name);
-                                    msg += '\n';
-
-                                    msg += ("Arrival Time: " + transit.arrival_time.text);
-                                    msg += '\n';
-
-                                    msg += ("Departure Stop Name: " + transit.departure_stop.name);
-                                    msg += '\n';
-
-                                    msg += ("Departure Time: " + transit.departure_time.text);
-                                    msg += '\n';
-
-                                    msg += ("Headsign: "+ transit.headsign);
-                                    msg += '\n';
-
-                                    
-                                    google_array.push(msg);
+                                    transitLegInfo = 
+                                    {
+                                        transitArrivalTime: leg.arrival_time.text,
+                                        transitDepartureTime: leg.departure_time.text,
+                                        transitDistance: leg.distance.text,
+                                        transitDuration: leg.duration.text,
+                                        transitSteps: [],
+                                    };
                                 }
-                            }
+                        
+                                // There are many steps
+                                let steps: Transit.IStep[] = leg.steps
 
-                            // save the transit information
-                            session.userData.google_array = google_array;
-                            transitFlag = true;
+                                steps.forEach(step => 
+                                {
+                                    if (step.travel_mode == "WALKING")
+                                    {
+                                        let walkingStepInfo: Transit.IStepWalkingInfo = 
+                                        {
+                                            stepDistance: step.distance.text,
+                                            stepDuration: step.duration.text,
+                                            stepMainInstruction: step.html_instructions,
+                                            stepTransitMode: step.travel_mode,
+                                            stepDeatiledInstructions: []
+                                        };
+
+                                        step.steps.forEach(detailedStep => 
+                                        {
+                                            let detailedStepInfo: Transit.IStepDetailedWalkingInfo =
+                                            {
+                                                stepDistance: detailedStep.distance.text,
+                                                stepDuration: detailedStep.duration.text,
+                                                stepMainInstruction: HtmlParse(detailedStep.html_instructions),
+                                                stepTransitMode: detailedStep.travel_mode
+                                            };
+
+                                            // Add to Main step deailted instruction array 
+                                            walkingStepInfo.stepDeatiledInstructions.push(detailedStepInfo);
+                                        });
+                                        
+                                        // Add the step and instruction to the main leg info
+                                        transitLegInfo.transitSteps.push(walkingStepInfo);
+                                    }
+
+                                    else //( step.travel_mode == "TRANSIT")
+                                    {
+                                        let transitStepInfo: Transit.IStepTransitInfo =
+                                        {
+                                            stepDistance: step.distance.text,
+                                            stepDuration: step.duration.text,
+                                            stepMainInstruction: step.html_instructions,
+                                            stepTransitMode: step.travel_mode,
+                                            arrivalStopName: step.transit_details.arrival_stop.name,
+                                            arrivalStopTime: step.transit_details.arrival_time.text,
+                                            departureStopName: step.transit_details.departure_stop.name,
+                                            departureStopTime: step.transit_details.departure_time.text,
+                                            numberOfStop: step.transit_details.num_stops,
+                                            vehicleName: step.transit_details.headsign,
+                                            vehicleType: step.transit_details.line.vehicle.type
+                                        }
+
+                                        // Push to steps
+                                        transitLegInfo.transitSteps.push(transitStepInfo);
+                                    }
+                    
+                                });
+                                // save the transit information
+                                session.userData.Transit = transitLegInfo;
+                                transitFlag = true;
+                            });
                         }
                     }
                 }
-            } // Ends callback for google 
-        ); // Ends google maps transits function 
+            });
 
 //=========================================================
 // Uber information 
@@ -939,20 +937,23 @@ bot.dialog('/', [
         // Grab the infomation
         let uber: Uber.IBestOption = session.userData.Uber;
         let lyft: Lyft.IBestLyftOption = session.userData.Lyft;
-        let transitInfo: string = session.userData.Transit;
-        let transitSteps: any = session.userData.google_array;
-        let options: Results.IOptions;
-        let transit: Results.ITransit;
-        let rideshare: Results.IRideshare;
+        let transitInfo: Transit.IFinalLegInfo = session.userData.Transit;
+        let rideshare: Results.IRideshare = 
+        {
+            driverTime: "Error",
+            price: 'Error',
+            serviceProvider: "Error",
+            serviceType: "Error",
+            totalDistance: "Error",
+            totalTime: "Error"            
+        }
 
         console.log(uber);
         console.log();
         console.log(lyft);
         console.log();
         console.log(transitInfo);
-        console.log();
-        console.log(transitSteps);
-        console.log();
+
 
         // If the preference is for value
         if (preference == 0)
@@ -963,7 +964,7 @@ bot.dialog('/', [
             // Find the lower price
             if (uberPrice < lyftPrice)
             {   
-                rideshare=
+                rideshare =
                 {
                     driverTime: (uber.uber_driver_time / 60).toPrecision(2),
                     price : uberPrice.toPrecision(2),
@@ -971,19 +972,8 @@ bot.dialog('/', [
                     serviceType : uber.uber_name,
                     totalDistance : uber.uber_distance.toPrecision(2),
                     totalTime : (uber.uber_travel_time / 60).toPrecision(2)
-                }
+                };
 
-                transit =
-                {
-                    mainInfo: transitInfo,
-                    steps: transitSteps
-                }
-
-                options = 
-                {
-                    rideshare: rideshare,
-                    transit: transit
-                }
             }
             else
             {
@@ -995,19 +985,8 @@ bot.dialog('/', [
                     serviceType : lyft.display_name,
                     totalDistance : lyft.estimated_distance_miles.toPrecision(2),
                     totalTime : (lyft.estimated_duration_seconds / 60).toPrecision(2)
-                }
+                };
 
-                transit =
-                {
-                    mainInfo: transitInfo,
-                    steps: transitSteps
-                }
-
-                options = 
-                {
-                    rideshare: rideshare,
-                    transit: transit
-                }
             }
         }
 
@@ -1019,20 +998,95 @@ bot.dialog('/', [
 
             if (uberDriverTime < lyftDriverTime)
             {
-
+                rideshare =
+                {
+                    driverTime: (uber.uber_driver_time / 60).toPrecision(2),
+                    price : uber.uber_price.toPrecision(2),
+                    serviceProvider: "Uber",
+                    serviceType : uber.uber_name,
+                    totalDistance : uber.uber_distance.toPrecision(2),
+                    totalTime : (uber.uber_travel_time / 60).toPrecision(2)
+                };
             }
             else
             {
-
+                rideshare =
+                {
+                    driverTime: (lyft.driver_time / 60).toPrecision(2),
+                    price : lyft.price.toPrecision(2),
+                    serviceProvider: "Lyft",
+                    serviceType : lyft.display_name,
+                    totalDistance : lyft.estimated_distance_miles.toPrecision(2),
+                    totalTime : (lyft.estimated_duration_seconds / 60).toPrecision(2)
+                };
             }
         }
 
         // Preference is for luxury
         if (preference == 2)
         {
-            // Use Uber because of lux 
+            rideshare = 
+            {
+                driverTime: (uber.uber_driver_time / 60).toPrecision(2),
+                price: uber.uber_price.toPrecision(2),
+                serviceProvider: "Uber",
+                serviceType: uber.uber_name,
+                totalDistance: uber.uber_distance.toPrecision(2),
+                totalTime: (uber.uber_travel_time / 60).toPrecision(2)
+            };
         }
 
+        // Build out the strings
+        let transitString: string = `Transit <br/>
+        - Departure Time: ${transitInfo.transitDepartureTime} <br/>
+        - Arrival Time: ${transitInfo.transitArrivalTime} <br/>
+        - Distance: ${transitInfo.transitDistance} miles <br/>
+        - Duration ${transitInfo.transitDuration} minutes <br/>`;
+
+        let rideshareString: string = `Rideshare <br/>
+        - Service: ${rideshare.serviceProvider} <br/>
+        - Ride Type: ${rideshare.serviceType} <br/>
+        - Price: ${rideshare.price} <br/>
+        - Driver Distance: ${rideshare.driverTime} minutes away <br/>
+        - Total Distance: ${rideshare.totalDistance} miles <br/>
+        - Total Duration: ${rideshare.totalTime} minutes <br/>`;
+
+        session.send(transitString + rideshareString);
+
+        // Add the options to the userdata
+        session.userData.Rideshare = rideshare;
+
+        builder.Prompts.choice(session, "Type the number or name to order or get more info", [
+            "Transit",
+            "Rideshare"
+        ]);
+
+    },
+
+    function(session: builder.Session, response: builder.IPromptChoiceResult, next: Function)
+    {
+        // Get the transit and rideshare options 
+        let transit: Transit.IFinalLegInfo = session.userData.Transit;
+        let rideshare: Results.IRideshare = session.userData.Rideshare;
+
+        if (response.response.index == 0)
+        {
+
+        }
+
+        else if (response.response.index == 1)
+        {
+            // Check the rideshare service provider
+            if (rideshare.serviceProvider == "Uber")
+            {
+                // Order the Uber
+            } 
+
+            else if (rideshare.serviceProvider == 'Lyft')
+            {
+                // Order the Lyft
+            }
+        }
     }
 
     ])  

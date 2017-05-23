@@ -5,6 +5,8 @@ import * as googleMaps from "@google/maps";
 import {Uber} from "./uber";
 import {Lyft} from "./lyft";
 import {Results} from "./results";
+import {Transit} from "./transit";
+import * as util from "util"
 
 let googleMapsClient: any = googleMaps.createClient({
     key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' //process.env.GOOGLE_MAPS_KEY
@@ -56,21 +58,6 @@ function HtmlParse (html: string): string
     return (html_return.replace(/  /g, " ").trim())
 }
 
-let Checker: Function = function Timeout(transit: boolean, uber: boolean, lyft: boolean, next)
-{
-    if (!transit && !uber && !lyft)
-    {
-        // Go to the aggregations
-        next();
-    }
-    else
-    {
-        setTimeout(function() {
-            console.log("Waiting for information");
-            Timeout(transit, uber, lyft, next);
-        }, 100);
-    }
-}
 
 //=========================================================
 // Bots Dialogs
@@ -302,7 +289,7 @@ bot.dialog('/', [
 // Google Transit
 //=========================================================
 
-        let transitUrl: string = 'https://maps.googleapis.com/maps/api/directions/outputFormat?json';
+        let transitUrl: string = 'https://maps.googleapis.com/maps/api/directions/json?';
         let transitOrigin: string = '&origin=' + start_lat + ',' + start_long;
         let transitDestination: string = '&destination=' + end_lat + ',' + end_long;
         let transitMode: string = '&mode=transit';
@@ -313,8 +300,20 @@ bot.dialog('/', [
         let transitQuery = transitUrl + transitOrigin + transitDestination + transitMode + transitLanguage + transitUnits + 
             transitKey;
 
+        let transitHeaders: request.Headers =
+        {
+            'Content-Type': 'application/json',
+            'Accept-Language': 'en_EN'
+        }; 
+
+        let transitOptions: request.OptionsWithUrl = {
+
+            url: transitQuery,
+            headers: transitHeaders
+        }
+
         // Send the request for transif information
-        request(transitQuery,
+        request(transitOptions,
 
             function(error, response, info)
             {
@@ -330,25 +329,29 @@ bot.dialog('/', [
                     console.log("No error in transit");
 
                     // Convert the string into json 
-                    let body: any = JSON.parse(info);
-                    
-                    // Check to see if there is no results
-                    if (response.json.status == "ZERO_RESULTS" || response.json.status == "NOT_FOUND")
+
+                    console.log(info);
+                    console.log("\n\n\n\n\n\n\n\n\n");
+                    let body: Transit.IAllTransitInfo = JSON.parse(info);
+
+                    console.log(util.inspect(body, false, null));
+
+                    if (body.status != "OK")
                     {
                         console.log("No transit in area");
                         session.send("Transit is not available in this area.");
                     }
-
+                
                     else
                     {
                         console.log("Transit in area");
                         
-                        // Get the results 
-                        let legs: any = response.json.routes[0].legs[0];
+                        // Get the results
+                        for (let route_step: number = 0; route_step < body.routes.length; route_step++)
+                        {
+                            let legs: Transit.ILeg[] = body.routes[route_step].legs
 
-                        console.log(response);
-                        console.log(response.json);
-                        console.log(response.json.routes);
+                        }
 
                         // If there is only one step
                         if (legs.steps.length == 1)

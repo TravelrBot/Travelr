@@ -349,7 +349,13 @@ bot.dialog('/', [
                         // Get the results
                         for (let route_step: number = 0; route_step < body.routes.length; route_step++)
                         {
-                            let legs: Transit.ILeg[] = body.routes[route_step].legs
+                            let legs: Transit.ILeg[] = body.routes[route_step].legs;
+
+                            // loop through each leg
+                            legs.forEach(leg => 
+                            {
+                                    let steps: Transit.IStep[] = leg.steps
+                            });
 
                         }
 

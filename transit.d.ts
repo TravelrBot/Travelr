@@ -80,27 +80,12 @@ export declare namespace Transit {
         name: string;
     }
 
-    export interface IArrivalTime2 {
-        text: string;
-        time_zone: string;
-        value: number;
-    }
-
-    export interface ILocation2 {
-        lat: number;
-        lng: number;
-    }
 
     export interface IDepartureStop {
-        location: ILocation2;
+        location: ILocation;
         name: string;
     }
 
-    export interface IDepartureTime2 {
-        text: string;
-        time_zone: string;
-        value: number;
-    }
 
     export interface IAgency {
         name: string;
@@ -124,9 +109,9 @@ export declare namespace Transit {
 
     export interface ITransitDetails {
         arrival_stop: IArrivalStop;
-        arrival_time: IArrivalTime2;
+        arrival_time: IArrivalTime;
         departure_stop: IDepartureStop;
-        departure_time: IDepartureTime2;
+        departure_time: IDepartureTime;
         headsign: string;
         line: ILine;
         num_stops: number;
@@ -177,6 +162,49 @@ export declare namespace Transit {
         routes: IRoute[];
         status: string;
     }
+
+    export interface IFinalLegInfo
+    {
+        transitArrivalTime: string;
+        transitDepartureTime: string;
+        transitDuration: string;
+        transitDistance: string;
+        transitSteps: IStepInfo[];
+    }
+
+    export interface IStepInfo
+    {
+        stepDistance: string;
+        stepDuration: string;
+        stepTransitMode: string;
+        stepMainInstruction: string;
+    }
+
+    export interface IStepDetailedWalkingInfo
+    {
+        stepDistance: string;
+        stepDuration: string;
+        stepMainInstruction: string;
+        stepTransitMode: string;
+    }
+
+
+    export interface IStepWalkingInfo extends IStepInfo
+    {   
+        stepDeatiledInstructions: IStepDetailedWalkingInfo[];    
+    }
+
+    export interface IStepTransitInfo extends IStepInfo
+    {
+        arrivalStopName: string;
+        arrivalStopTime: string;
+        departureStopName: string;
+        departureStopTime: string;
+        numberOfStop: number;
+        vehicleType: string;
+        vehicleName: string;
+    }
+
 
 }
 

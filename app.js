@@ -7,7 +7,7 @@ const googleMaps = require("@google/maps");
 const process = require('process');
 
 var googleMapsClient = googleMaps.createClient({
-    key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' //process.env.GOOGLE_MAPS_KEY
+    key: process.env.GOOGLE_MAPS_KEY
 });
 // Setup Restify Server
 var server = restify.createServer();
@@ -16,8 +16,8 @@ server.listen(process.env.port || process.env.PORT || 3978, function () {
 });
 // Create chat bot 
 var connector = new builder.ChatConnector({
-    appId: "",
-    appPassword: "" //'4VGq7jLMxiDxDBwoYefSrfg' //process.env.MICROSOFT_APP_PASSWORD
+    appId: MICROSOFT_APP_ID,
+    appPassword: process.env.MICROSOFT_APP_PASSWORD
 });
 var bot = new builder.UniversalBot(connector);
 server.post('/api/messages', connector.listen());

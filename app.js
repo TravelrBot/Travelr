@@ -1,889 +1,844 @@
-var restify = require('restify');
-var builder = require('botbuilder');
-var request = require('request');
-var Uber = require('node-uber');
-var googleMapsClient = require('@google/maps').createClient({
-    key: process.env.GOOGLE_MAPS_KEY
-});
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const builder = require("botbuilder");
+const restify = require("restify");
+const request = require("request");
+const googleMaps = require("@google/maps");
+const process = require('process');
 
+var googleMapsClient = googleMaps.createClient({
+    key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' //process.env.GOOGLE_MAPS_KEY
+});
 // Setup Restify Server
 var server = restify.createServer();
 server.listen(process.env.port || process.env.PORT || 3978, function () {
-   console.log('%s listening to %s', server.name, server.url); 
+    console.log('%s listening to %s', server.name, server.url);
 });
-
-  
-// Create chat bot
+// Create chat bot 
 var connector = new builder.ChatConnector({
-    appId: process.env.MICROSOFT_APP_ID,
-    appPassword: process.env.MICROSOFT_APP_PASSWORD
+    appId: "",
+    appPassword: "" //'4VGq7jLMxiDxDBwoYefSrfg' //process.env.MICROSOFT_APP_PASSWORD
 });
 var bot = new builder.UniversalBot(connector);
 server.post('/api/messages', connector.listen());
-
 // Serve a static web page
 server.get(/.*/, restify.serveStatic({
-	'directory': './templated-urban',
-	'default': 'Index.html'})
-);	
-
-// create intents
-//var intents = new builder.IntentDialog();
-
-
-// function to parse html 
-function HtmlParse (html) {
-
-    // declare the constants
-    html += ' ' 
+    'directory': '.',
+    'default': 'Index.html'
+}));
+function HtmlParse(html) {
+    html += " ";
     var html_array = html.split("");
     var html_return = '';
-
     // loop through each word 
-    for (var i = 0; i < html_array.length; i+= 1)
-    {
-        if (html_array[i] == "<")
-        {
-            while (html_array[i] != '>' || html_array[i+1] == "<")
-            {
+    for (var i = 0; i < html_array.length; i += 1) {
+        if (html_array[i] == "<") {
+            while (html_array[i] != '>' || html_array[i + 1] == "<") {
                 i++;
             }
-
-            i++
+            i++;
         }
-
         html_return += html_array[i];
     }
-
     return (html_return.replace(/  /g, " ").trim());
-
 }
-
+function LocationAddressFomater(address) {
+    'pickup[formatted_address]=DFW%20Airport%2C%20Grapevine%2C%20TX%2C%20United%20States';
+    var addressSplit = address.split(" ");
+    var formattedAddress = '';
+    for (var index = 0; index < addressSplit.length; index++) {
+        formattedAddress += (addressSplit[index]);
+        if (index < addressSplit.length - 1) {
+            formattedAddress += '%20';
+        }
+        else {
+            // add nothing 
+            continue;
+        }
+    }
+    return formattedAddress;
+}
 //=========================================================
 // Bots Dialogs
 //=========================================================
-
-bot.dialog('/', new builder.IntentDialog()
-    .matches('lyft', '/lyft')
-    .matches('uber', '/uber')
-    .matches('transit', '/transit')
-    .onDefault('/waterfall'));
-
-bot.dialog('/waterfall', [
-
+bot.dialog('/', [
     // send the intro
-    function (session, args, next){
-        session.send("Hello and welcome to Travelr! Just tell us where you are going and we will get you there as quickly as possible!");
+    function (session, args, next) {
+        session.send("Hello and welcome to Travelr! We just need a few details to get you to your destination!");
         next();
     },
-
+    // Get the user's preference
+    function (session) {
+        builder.Prompts.choice(session, "What is your preference on transportation?", "Value|Time|Luxury");
+    },
+    // Save the perference 
+    function (session, result, next) {
+        switch (result.response.index) {
+            case 0:
+                session.userData.perference = 0;
+                break;
+            case 1:
+                session.userData.perference = 1;
+                break;
+            case 2:
+                session.userData.perference = 2;
+            default:
+                session.userData.perference = 0;
+                break;
+        }
+        next();
+    },
+    // Ask about seating preferences
+    function (session) {
+        builder.Prompts.choice(session, "Do you have more than 4 people?", "Yes|No");
+    },
+    function (session, result, next) {
+        switch (result.response.index) {
+            case 0:
+                session.userData.group = true;
+                break;
+            case 1:
+                session.userData.group = false;
+                break;
+            default:
+                session.userData.group = true;
+                break;
+        }
+        // Go to the next step
+        next();
+    },
     // get the user's starting location
-    function(session){
+    function (session) {
         builder.Prompts.text(session, "What is your starting location?");
     },
-
-//=========================================================
-// Google Geolocation
-//=========================================================
-
-    // save the result
+    //=========================================================
+    // Google Geolocation
+    //=========================================================
+    // save the result 
     function (session, result, next) {
-        console.log();
-        var test;
-        var test2;
         session.userData.start = result.response;
-
-        // call the google maps function to get the coordinates
+        // call the google maps function to get the coordinates 
         googleMapsClient.geocode({
-            address: session.userData.start
-            }, function(err, response) {
-                if (!err) {
-
-                    // get the latitutde
-                    test = response.json.results[0].geometry.location.lat;
-
-                    // get the longitude
-                    test2 = response.json.results[0].geometry.location.lng
-                    
-                }
-            
-            })
-        
-        setTimeout(function() {
-            session.userData.start_lat = test;
-            session.userData.start_long = test2;
-            next();
-        }, 2000);
-        
+            address: result.response
+        }, function (err, response) {
+            if (!err) {
+                // Get and save the latitude
+                session.userData.start_lat = response.json.results[0].geometry.location.lat;
+                // get the longitude
+                session.userData.start_long = response.json.results[0].geometry.location.lng;
+                // Proceed to the next dialogue 
+                next();
+            }
+            else {
+            }
+        });
     },
-
-    // get the user's destination location
-    function(session) {
+    // Get the users's destination lcoation
+    function (session) {
+        console.log("Asking for destination");
         builder.Prompts.text(session, "What is your destination?");
-        console.log();
     },
-
-    // save the results
-    function(session, results, next) {
+    // Save the results 
+    function (session, results, next) {
+        console.log("Have the users desstination");
         session.userData.end = results.response;
-        console.log();
-
+        // Call the google maps clinent
         googleMapsClient.geocode({
-            address: session.userData.end
-            }, function(err, responses) {
-                if (!err) {
-
-                    // get the latitutde
-                    session.userData.end_lat = responses.json.results[0].
+            address: results.response
+        }, function (err, response) {
+            if (!err) {
+                // get the latitutde
+                session.userData.end_lat = response.json.results[0].
                     geometry.location.lat;
-
-                    // get the longitude
-                    session.userData.end_long = responses.json.results[0].
-                    geometry.location.lng
-                }
-            });
-
-        next();
+                // get the longitude
+                session.userData.end_long = response.json.results[0].geometry.location.lng;
+                next();
+            }
+            else {
+                // call the error dialogue
+                // Unable to determine location
+                console.log();
+            }
+        });
     },
-
-    // begin processing the information
-    function(session, args, next) {
-        session.send("Hold on while we get your results!");
-        setTimeout(function() {
-            next();
-        }, 2000);
-    },
-
-//=========================================================
-// Map information 
-//=========================================================
-
-    // Get the map data and sent it to the user
-    function(session, args, next)
-    {
-
+    //=========================================================
+    // Map information 
+    //=========================================================
+    // Begin processing the information
+    function (session, args, next) {
+        session.send("Hold on while we get your results");
         // pull down the lats and long
         var start_lat = session.userData.start_lat;
         var end_lat = session.userData.end_lat;
         var start_long = session.userData.start_long;
-        var end_long = session.userData.end_long
-
+        var end_long = session.userData.end_long;
         var MainUrl = "https://maps.googleapis.com/maps/api/staticmap?";
-
         var Key = "&key=AIzaSyDQmIfhoqmGszLRkinJi7mD7SEWt2bQFv8";
-
-        // place holder value for zoom level
-        var intZoom;
-
-        // Check for zoom level
-        // Inital check for lats that are short 
-        if (Math.abs(start_lat - end_lat) <= 0.1)
-        {
-            if (Math.abs(start_long - end_long) <= 0.1)
-            {
-                intZoom = 16;
-            }
-            
-            else if (Math.abs(start_long - end_long) <= 0.5)
-            {
-                intZoom = 15;
-            }
-
-            else if (Math.abs(start_long - end_long) <= 1)
-            {
-                intZoom = 12;
-            }
-
-            else
-            {
-                intZoom = 8;
-            }
-
-        }
-
-        else if (Math.abs(start_lat - end_lat) > .1 && Math.abs(start_lat - end_lat) <= .5)
-        {
-            if (Math.abs(start_long - end_long) <= 0.1)
-            {
-                intZoom = 14;
-            }
-            
-            else if (Math.abs(start_long - end_long) <= 0.5)
-            {
-                intZoom = 12;
-            }
-
-            else if (Math.abs(start_long - end_long) <= 1)
-            {
-                intZoom = 10;
-            }
-
-            else
-            {
-                intZoom = 8;
-            }
-        }
-
-        else if (Math.abs(start_lat - end_lat) > .5 && Math.abs(start_lat - end_lat) <= 1)
-        {
-            intZoom = 10;
-        }
-
-        else 
-        {
-            intZoom = 8;
-        }
-
-
-
-        var Zoom = "zoom=" + intZoom.toString();
-
+        // Set the constants
         var Size = "&size=640x640";
-
         var Format = "&format=gif";
-
-        var MarkerStyleStart = "&markers=color:red|label:A|" + start_lat + "," + start_long;  
-
-        var MarkerStyleEnd = "&markers=color:red|label:B|" + end_lat + "," + end_long; 
-
+        var MarkerStyleStart = "&markers=color:red|label:A|" + start_lat + "," + start_long;
+        var MarkerStyleEnd = "&markers=color:red|label:B|" + end_lat + "," + end_long;
         var Path = "&path=color:blue|" + session.userData.start_lat + "," + session.userData.start_long + "|" + session.userData.end_lat + "," + session.userData.end_long;
-
-        var Query = MainUrl + Zoom + Size + Format + MarkerStyleStart + MarkerStyleEnd + Path + Key; 
-
+        var Query = MainUrl + Size + Format + MarkerStyleStart + MarkerStyleEnd + Path + Key;
         session.send("Here is a map of your locations");
-
         // Build the new message 
         var msg = new builder.Message(session)
-        .attachments([{
-            contentType: "image/gif",
-            contentUrl: Query
-        }]);
-
+            .attachments([{
+                contentType: "image/gif",
+                contentUrl: Query
+            }]);
         // Send the message
         session.send(msg);
-
+        // Go to the next step
         next();
     },
-
-
-//=========================================================
-// Google transit information 
-//=========================================================
-
-    // get transit
-    function(session, arg, next) {
-
-        // blank line
-        console.log();
-
-        googleMapsClient.directions({
-            origin: {
-                lat: session.userData.start_lat,
-                lng: session.userData.start_long
-            },
-            destination: {
-                lat: session.userData.end_lat,
-                lng: session.userData.end_long
-            },
-            mode: "transit"
-        }, function(err, response) {
-
-            if(!err){
-
-                // get the fair 
-                console.log(response.json.status);
-
-                if (response.json.status == "ZERO_RESULTS" || response.json.status == "NOT_FOUND")
-                {
-                    session.send("Transit is not available in this area.")
+    //=========================================================
+    // Get all of the information
+    //=========================================================
+    // Get transit
+    function (session, ars, next) {
+        // Log step to console
+        console.log("Getting Google Transit informaiton");
+        // Set the constants 
+        // pull down the lats and long
+        var start_lat = session.userData.start_lat;
+        var end_lat = session.userData.end_lat;
+        var start_long = session.userData.start_long;
+        var end_long = session.userData.end_long;
+        // Flags for finished api pulls
+        var transitFlag = false;
+        var uberFlag = false;
+        var lyftFlag = false;
+        //=========================================================
+        // Google Transit
+        //=========================================================
+        var transitUrl = 'https://maps.googleapis.com/maps/api/directions/json?';
+        var transitOrigin = '&origin=' + start_lat + ',' + start_long;
+        var transitDestination = '&destination=' + end_lat + ',' + end_long;
+        var transitMode = '&mode=transit';
+        var transitLanguage = "&language=en";
+        var transitUnits = '&units=imperial';
+        var transitKey = "&key=AIzaSyDQmIfhoqmGszLRkinJi7mD7SEWt2bQFv8";
+        var transitQuery = transitUrl + transitOrigin + transitDestination + transitMode + transitLanguage + transitUnits +
+            transitKey;
+        var transitHeaders = {
+            'Content-Type': 'application/json',
+            'Accept-Language': 'en_EN'
+        };
+        var transitOptions = {
+            url: transitQuery,
+            headers: transitHeaders
+        };
+        // Send the request for transif information
+        request(transitOptions, function (error, response, info) {
+            // Check if Error
+            if (error) {
+                // Send a message to indicate error 
+                console.log(error);
+                session.send("There was an unknown error getting transit info");
+            }
+            else {
+                console.log("No error in transit");
+                // Convert the string into json 
+                var body = JSON.parse(info);
+                if (body.status != "OK") {
+                    console.log("No transit in area");
+                    session.send("Transit is not available in this area.");
                 }
-
-                else
-                {
-                    //console.log();
-
-                    //console.log(response.json.routes);
-
-                    //console.log();
-                    
-                    // get the time, distance, and route
-                    //console.log(response.json.routes[0].legs);
-
-                    console.log();
-                    var legs = response.json.routes[0].legs[0];
-                
-                    //console.log(legs);
-
-
-                    if (legs.steps.length == 1)
-                    {   
-                        // send the Distance
-                        session.send('Transit -> Distance: ' + (legs.distance.text) +
-                        'Duration: ' + (legs.duration.text) + 
-                        HtmlParse(legs.steps[0].html_instructions) );
-
-                        // console.log(legs.steps[0].steps);
-
-                        var g;
-                        var google_array = [];
-
-                        for (g in legs.steps[0].steps)
-                        {
-                            google_array.push( HtmlParse(legs.steps[0].steps[g].html_instructions) );
-                        }
-
-                        // add the array to the userData
-                        session.userData.google_array = google_array;
-
-                    }
-
-                    else
-                    {
-                        // send the depart time 
-                        session.send("Transit -> Depart Time: " + 
-                        legs.departure_time.text + " " + "Arrival Time: " + 
-                        legs.arrival_time.text + " " + "Total Time: " + 
-                        legs.duration.text + " " + "Total Distance: " + 
-                        legs.distance.text + " ");
-
-                        // send the steps
-                        //var f; 
-                        //for (f in legs.steps){console.log(legs.steps[f]);
-                            //console.log();}
-
-                        var q;
-                        var r; 
-                        var google_array = [];
-                        for (q in legs.steps) {
-
-                            var string = ""
-
-                            if (legs.steps[q].travel_mode == 'WALKING')
-                            {
-                                // log the big instruction 
-                                string += (HtmlParse(legs.steps[q].html_instructions));
-                                string += "\n";
-
-                                for (r in legs.steps[q].steps)
-                                {
-                                    string += (HtmlParse(legs.steps[q].steps[r].html_instructions));
-                                    string += '\n';
-                                }
-                                
-                                // add the string to the array
-                                google_array.push(string);
-                            }
-
-                            else
-                            {
-                                // log the main html_instructions
-                                console.log(legs.steps[q].html_instructions);
-
-                                string += (legs.steps[q].html_instructions);
-
-                                var transit = legs.steps[q].transit_details; 
-
-                                string += ("Arrival Stop Name:" + transit.arrival_stop.name);
-                                string += '\n';
-
-                                string += ("Arrival Time: " + transit.arrival_time.text);
-                                string += '\n';
-
-                                string += ("Departure Stop Name: " + transit.departure_stop.name);
-                                string += '\n';
-
-                                string += ("Departure Time: " + transit.departure_time.text);
-                                string += '\n';
-
-                                string += ("Headsign: "+ transit.headsign);
-                                string += '\n';
-
-                                
-                                google_array.push(string);
-                            }
-                        }
-
-                        // save the transit information
-                        session.userData.google_array = google_array;
-
-                    } // end else if steps are longer than 1
-
-                } // end else after check for no results     
-            }
-
-            else
-            {
-                console.log(err);
-            }   
-
-            next();
-        });
-
-    },
-
-//=========================================================
-// Uber information 
-//=========================================================
-
-    function(session, args, next)
-    {
-        console.log("in uber");
-
-        // initialize an uber object
-        var uber = new Uber({
-            client_id: '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP', //process.env.UBER_APP_ID,
-            client_secret: 'vAy-juG54SV15yiv7hsDgVMegvMDPbjbtuayZ48a' ,//process.env.UBER_APP_PASSWORD,
-            server_token: '2By_BZgRZCMelkCHxVyWUCcTg1z6UfkPfo7UZM6O' , //process.env.UBER_APP_TOKEN,
-            redirect_uri: '',
-            name: 'TravelrApp',
-        });
-
-        // get the price estimate information
-        uber.estimates.getPriceForRoute(session.userData.start_lat
-        , session.userData.start_long, session.userData.end_lat
-        , session.userData.end_long, function(err, res){
-        
-        try
-        {   
-            var prices = res.prices;
-
-            console.log(res);
-
-            // check to see if response is empty
-            if (prices[0] == null)
-            {
-                session.send("Uber is not available in this area.");
-            }
-
-            else
-            {
-                // send the duration and the distance 
-                var duration = prices[0].duration / 60;
-                session.send("Uber:  Duration: " + duration.toString() + "  minutes" +
-                "Distance: " + prices[0].distance + "  miles");
-
-                var u;
-                var uber_array = [];
-                
-
-                for (u in prices) 
-                {
-                    // blank string to hold the stats
-                    var uber_dict = {
-                        "Name": prices[u].localized_display_name,
-                        "Surge Multipler": prices[u].surge_multiplier,
-                        "Estimate": prices[u].estimate
-                    };
-
-                    // check to see if the uberx
-                    // send the information for the cheapest one
-                    if (prices[u].localized_display_name.toLowerCase() == 'uberx')
-                    {   
-                        var uber_string = '';
-
-                        for (var element in uber_dict)
-                        {
-                            uber_string += element.toString() + ":  " + uber_dict[element] + " ";
-                        }
-
-                        session.send(uber_string);
-                    }
-
-                    // send uber array 
-                    uber_array.push(uber_dict);
-
-                } // end the for loop
-
-                uber.estimates.
-                getETAForLocationAsync(session.userData.start_lat, 
-                session.userData.start_long, function(err, res)
-                {
-                    if(err)
-                    {
-                        console.log(err);
-                    } // end if err
-
-                    else
-                    {
-                        var times = res.times;
-
-                        if (times[0] == null)
-                        {
-                            console.log("No times");
-                        }
-
-                        else
-                        {
-                            for (var ut in times)
-                            {
-                                for (var ua in uber_array)
-                                {
-                                    if (times[ut].localized_display_name == uber_array[ua].Name)
+                else {
+                    console.log("Transit in area");
+                    for (var route_step = 0; route_step < body.routes.length; route_step++) {
+                        // Right now there is only 1 route
+                        var legs = body.routes[route_step].legs;
+                        // loop through each leg
+                        // Right now there is only 1 leg because there are no waypoints
+                        legs.forEach(function (leg) {
+                            // Need to make sure that it is not only walking directions    
+                            var transitLegInfo;
+                            if (leg.steps.length == 1) {
+                                var currentTime = Date.now();
+                                var departureTime = currentTime;
+                                // Google Transit give time value in seconds
+                                // Muliply by 10 to get milliseconds to add to Date
+                                var arrivalTime = currentTime + (leg.duration.value * 10);
+                                // Convert the times into Date 
+                                var departureDate = new Date(departureTime);
+                                var arrivalDate = new Date(arrivalTime);
+                                transitLegInfo =
                                     {
-                                        uber_array[ua].Time = ((times[ut].estimate/60).toString() + " Minutes Away");
-                                    }
-
-                                    else
-                                    {
-                                        continue;
-                                    }
-                                }
+                                        transitArrivalTime: arrivalDate.getHours().toString() + (arrivalDate.getMinutes() < 10 ? ':0' : ':') + arrivalDate.getMinutes().toString(),
+                                        transitDepartureTime: departureDate.getHours() + (departureDate.getMinutes() < 10 ? ":0" : ":") + departureDate.getMinutes(),
+                                        transitDistance: leg.distance.text,
+                                        transitDuration: leg.duration.text,
+                                        transitSteps: [],
+                                    };
                             }
-                            
-                        }  // else for if data is sent
-
-                    } // end else - res 
-                })
-
-                // save the array to user data 
-                session.userData.uber_array = uber_array;
-
-            } // ends else in uber
-        
-        } // ends try
-
-        catch (err)
-        {
-            session.send("An error occured while searching for uber in this location." +
-            "It may not be available in this area. Please check your locations!")
-
-            console.log(err);
-        }
-            
-    }); // end of uber function for price estimates
-
-        // advance to next step
-        next();
-    },
-
-//=========================================================
-// Lyft Information
-//=========================================================
-    function (session, args, next)
-    {
-        
-        var access_token; 
-
+                            else {
+                                transitLegInfo =
+                                    {
+                                        transitArrivalTime: leg.arrival_time.text,
+                                        transitDepartureTime: leg.departure_time.text,
+                                        transitDistance: leg.distance.text,
+                                        transitDuration: leg.duration.text,
+                                        transitSteps: [],
+                                    };
+                            }
+                            // There are many steps
+                            var steps = leg.steps;
+                            steps.forEach(function (step) {
+                                if (step.travel_mode == "WALKING") {
+                                    var walkingStepInfo_1 = {
+                                        stepDistance: step.distance.text,
+                                        stepDuration: step.duration.text,
+                                        stepMainInstruction: step.html_instructions,
+                                        stepTransitMode: step.travel_mode,
+                                        stepDeatiledInstructions: []
+                                    };
+                                    step.steps.forEach(function (detailedStep) {
+                                        var detailedStepInfo = {
+                                            stepDistance: detailedStep.distance.text,
+                                            stepDuration: detailedStep.duration.text,
+                                            stepMainInstruction: HtmlParse(detailedStep.html_instructions),
+                                            stepTransitMode: detailedStep.travel_mode
+                                        };
+                                        // Add to Main step deailted instruction array 
+                                        walkingStepInfo_1.stepDeatiledInstructions.push(detailedStepInfo);
+                                    });
+                                    // Add the step and instruction to the main leg info
+                                    transitLegInfo.transitSteps.push(walkingStepInfo_1);
+                                }
+                                else {
+                                    var transitStepInfo = {
+                                        stepDistance: step.distance.text,
+                                        stepDuration: step.duration.text,
+                                        stepMainInstruction: step.html_instructions,
+                                        stepTransitMode: step.travel_mode,
+                                        arrivalStopName: step.transit_details.arrival_stop.name,
+                                        arrivalStopTime: step.transit_details.arrival_time.text,
+                                        departureStopName: step.transit_details.departure_stop.name,
+                                        departureStopTime: step.transit_details.departure_time.text,
+                                        numberOfStop: step.transit_details.num_stops,
+                                        vehicleName: step.transit_details.headsign,
+                                        vehicleType: step.transit_details.line.vehicle.type
+                                    };
+                                    // Push to steps
+                                    transitLegInfo.transitSteps.push(transitStepInfo);
+                                }
+                            });
+                            // save the transit information
+                            session.userData.Transit = transitLegInfo;
+                            transitFlag = true;
+                        });
+                    }
+                }
+            }
+        });
+        //=========================================================
+        // Uber information 
+        //=========================================================
+        console.log("In uber");
+        // Set all of the constants
+        var client_id = '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP'; //process.env.UBER_APP_ID,
+        var client_secret = 'vAy-juG54SV15yiv7hsDgVMegvMDPbjbtuayZ48a'; //process.env.UBER_APP_PASSWORD,
+        var server_token = 'CSQlbbbn6k0gbYZULEqiLk0cwUy03ZIPkIYxPrOs'; //process.env.UBER_APP_TOKEN,
+        var perference = session.userData.perference;
+        var group = session.userData.group;
+        var rides = [];
+        // Send the request for products
+        // This is where we will check for seat capcaity and or luxury options
+        // This is mainly to exclude certain options, not to include
         var headers = {
-            'Content-Type': 'application/json'
+            'Authorization': 'Token ' + server_token,
+            'Content-Type': 'application/json',
+            'Accept-Language': 'en_EN'
         };
-
-        var dataString = '{"grant_type": "client_credentials", "scope": "public"}';
-        
         var options = {
-            url: 'https://api.lyft.com/oauth/token',
-            method: 'POST',
-            headers: headers,
-            body: dataString,
-            auth: {
-                'user': '9LHHn1wknlgs', //process.env.LYFT_APP_ID,
-                'pass': '9Jz-WN7J3dMoVFcMhw9wGtVcDg1fK1gV' //process.env.LYFT_APP_PASSWORD
-            }
+            url: 'https://api.uber.com/v1.2/products?latitude=' + start_lat + '&longitude=' + start_long,
+            headers: headers
         };
-
-        request(options, function(err, obj, res){
-            if (err){
-                console.log(err);
+        request(options, function (error, response, info) {
+            if (error) {
+                // TODO: skip over uber
+                console.log("Error when getting uber info");
+                next();
             }
-            else
-            {
-                // get the access token 
-                var parsed = JSON.parse(res);
-                var access_token = parsed.access_token;
-                console.log(res);
-                console.log(access_token);
-
-                var headers = {
-                     'Authorization': 'bearer ' + access_token
+            var body = JSON.parse(info);
+            console.log("Got Uber Product info");
+            for (var index = 0; index < body.products.length; index++) {
+                var ride = body.products[index];
+                if (perference == 2) {
+                    if (ride.display_name == "SELECT" || ride.display_name == "BLACK" || ride.display_name == "SUV") {
+                        rides.push({ display_name: ride.display_name });
+                    }
+                }
+                if (group) {
+                    if (ride.capacity > 4) {
+                        rides.push({ display_name: ride.display_name });
+                        continue;
+                    }
+                }
+                if (!group) {
+                    if (ride.capacity < 5) {
+                        rides.push({ display_name: ride.display_name });
+                        continue;
+                    }
+                }
+            }
+            // Send the request for Prices
+            // Set the headers 
+            headers = {
+                'Authorization': 'Token ' + server_token,
+                'Content-Type': 'application/json',
+                'Accept-Language': 'en_EN'
+            };
+            // Set the options 
+            options = {
+                url: 'https://api.uber.com/v1.2/estimates/price?start_latitude=' + start_lat + '&start_longitude=' + start_long + '&end_latitude=' + end_lat + '&end_longitude=' + end_long,
+                method: 'GET',
+                headers: headers
+            };
+            // Make the request 
+            request(options, function (error, response, info) {
+                var body = JSON.parse(info);
+                var product = [];
+                // Set variables to hold the infomration
+                var uber_price = 99999;
+                var best_uber_option = {
+                    uber_distance: 0,
+                    uber_driver_time: 0,
+                    uber_name: "",
+                    uber_price: 0,
+                    uber_productId: "",
+                    uber_travel_time: 0
                 };
-
-                var url_lyft = 'https://api.lyft.com/v1/cost?start_lat=' + 
-                    session.userData.start_lat + '&start_lng=' + 
-                    session.userData.start_long + '&end_lat=' +
-                    session.userData.end_lat + '&end_lng=' +
-                    session.userData.end_long;
-
-
-                // create the get request 
-                var options = {
-                    url: url_lyft,
-                    method: "GET",
-                    headers: headers,
-                };
-
-                request(options, function(err, obj, res)
-                {
-
-                    try
-                    {
-                        if (err)
-                        {
-                            console.log(err);
-                        } // end if 
-
-                        else
-                        {
-                            // parse the json 
-                            var lyft_pared = JSON.parse(res);
-                            console.log(lyft_pared);
-
-                            if (lyft_pared.error)
-                            {
-                                session.send("Lyft is not available in this area --> " + lyft_pared.error_description);
-                            } // end if 
-
-                            else
-                            {   
-
-                                var duration = (lyft_pared.cost_estimates[0].estimated_duration_seconds / 60).toFixed(2);
-
-                                session.send("Lyft: " +
-                                'Distance: ' + lyft_pared.cost_estimates[0]
-                                .estimated_distance_miles + ' miles   ' + 
-                                "Duration: " + duration + ' minutes  ');
-
-                                var l; 
-                                var lyft_array = [];
-                                for (l in lyft_pared.cost_estimates)
-                                {
-                                    
-                                    // get the cost informaiton
-                                    var cost_min = lyft_pared.cost_estimates[l].estimated_cost_cents_min / 100;
-                                    var cost_max = lyft_pared.cost_estimates[l].estimated_cost_cents_max / 100;
-                                    var cost_string = "$" + cost_min.toString() + "--" + cost_max.toString();
-
-                                    // string to hold information
-                                    var lyft_dict = 
-                                    {
-                                        "Ride Type": lyft_pared.cost_estimates[l].display_name,
-                                        "Cost Estimate": cost_string,
-                                        "Primetime Percentage": lyft_pared.cost_estimates[l].primetime_percentage
-                                    }
-
-                                    // check to see if name is lyft
-                                    // send the cheapest information
-                                    if (lyft_pared.cost_estimates[l].ride_type.toLowerCase() == 'lyft')
-                                    {
-                                        var lyft_string = "";
-
-                                        for (var ls in lyft_dict)
-                                        {
-                                            lyft_string += ls.toString() + ":  " + lyft_dict[ls] + "-->";
-                                        }
-
-                                        // send the basic info
-                                        session.send(lyft_string);
-
-                                    } // end if
-
-                                    // push the information to the array
-                                    lyft_array.push(lyft_dict);
-
-                                } // end for
-
-                            } // end else 
-
-                        } // end else
-
-                        // Lyft for ETA Drivers
-
-                        var headers = 
-                        {
-                        'Authorization': 'bearer ' + access_token
-                        };
-
-                        var url_lyft = 'https://api.lyft.com/v1/eta?lat=' + 
-                            session.userData.start_lat + '&lng=' + 
-                            session.userData.start_long;
-
-                        // create the get request 
-                        var options = {
-                            url: url_lyft,
-                            method: "GET",
-                            headers: headers,
-                        };
-
-                        // send the request to get the driver eta
-                        request(options, function(error, response, body)
-                        {
-                            if(error)
-                            {
-                                console.log(error);
+                // Check to see if error 
+                if (error) {
+                    // Log the error
+                    console.log(error);
+                }
+                else {
+                    console.log("Have Uber prices");
+                    // Loop through each ride and match with product information 
+                    for (var index = 0; index < body.prices.length; index++) {
+                        var ride = body.prices[index];
+                        // Check to see if the product matches the terms already
+                        for (var e = 0; e < rides.length; e++) {
+                            if (ride.display_name == rides[e].display_name) {
+                                // Add the price info to the product array
+                                product.push(ride);
                             }
-
-                            else
-                            {
-                                var lyft_pared_eta = JSON.parse(body);
-                                console.log(lyft_pared_eta);
-
-                                // loop through the array
-                                // place the time information in lyft_dict
-                                for (var la in lyft_pared_eta["eta_estimates"])
-                                {
-                                    for (var lt in lyft_array)
-                                    {
-                                        if (lyft_pared_eta['eta_estimates'][la]["display_name"] == lyft_array[lt]["Ride Type"])
-                                        {
-                                            lyft_array[lt].Driver = ((lyft_pared_eta['eta_estimates'][la]["eta_seconds"] / 60).toString() + " Minutes Away");
-                                        }
-                                        else
-                                        {
-                                            continue
-                                        }
-                                    }
-                                }
-
-                                // save the information
-                                session.userData.lyft_array = lyft_array;
+                        }
+                    }
+                    // Now compare and find the cheapest price 
+                    for (var index = 0; index < product.length; index++) {
+                        // Create a holding variable
+                        var ride = product[index];
+                        // If index is 0 set the base price to that index
+                        if (index == 0) {
+                            // Change the pricing informaiton
+                            uber_price = ride.high_estimate;
+                            // Set the variable
+                            best_uber_option = {
+                                uber_distance: ride.distance,
+                                uber_driver_time: 0,
+                                uber_name: ride.display_name,
+                                uber_price: (ride.high_estimate + ride.low_estimate) / 2,
+                                uber_productId: ride.product_id,
+                                uber_travel_time: ride.duration
+                            };
+                        }
+                        if (uber_price > ride.high_estimate) {
+                            uber_price = ride.high_estimate;
+                            // Set the variable
+                            best_uber_option = {
+                                uber_distance: parseFloat(ride.display_name),
+                                uber_driver_time: 0,
+                                uber_name: ride.display_name,
+                                uber_price: (ride.high_estimate + ride.low_estimate) / 2,
+                                uber_productId: ride.product_id,
+                                uber_travel_time: ride.duration
+                            };
+                        }
+                    }
+                    // Send the request for Times
+                    // Set the headers 
+                    headers = {
+                        'Authorization': 'Token ' + server_token,
+                        'Content-Type': 'application/json',
+                        'Accept-Language': 'en_EN'
+                    };
+                    // Set the options 
+                    options = {
+                        url: 'https://api.uber.com/v1.2/estimates/time?start_latitude=' + start_lat + '&start_longitude=' + start_long + '&product_id=' + best_uber_option.uber_productId,
+                        method: 'GET',
+                        headers: headers
+                    };
+                    // Send the request for the time
+                    request(options, function (error, response, info) {
+                        if (error) {
+                            console.log(error);
+                        }
+                        else {
+                            console.log("Have driver times");
+                            // Parse the string into json
+                            var body_1 = JSON.parse(info);
+                            best_uber_option.uber_driver_time = body_1.times[0].estimate;
+                            // Set the User data
+                            session.userData.Uber = best_uber_option;
+                        }
+                        uberFlag = true;
+                        console.log("Finished Uber Driver Time");
+                    });
+                }
+                console.log("Finished Uber Price");
+            });
+            console.log("Finished Uber Products Maps");
+        });
+        //=========================================================
+        // Lyft information 
+        //=========================================================
+        console.log("In Lyft");
+        // Declare the constants
+        var lyftClientId = 'gAAAAABZIPjkPxmPgs83bWslOmxyt26-4AFcNDYZOwXWj4gyu7NEjddtxNK0DeNOqRrIsOCjKF-16_NiqApbMT-5vtGXJaulRmRk6b6QqDpYyU0MGYojno-FKnn58KzWRPwfoqFF8MUA5LTP0FpoNScafNXOeSgdic1eWsoGQm6Kg5c7TyQviRQ=';
+        var lyftHeaders = {
+            'Authorization': 'bearer ' + lyftClientId
+        };
+        var lyftOptions = {
+            url: 'https://api.lyft.com/v1/ridetypes?lat=' + start_lat + '&lng=' + start_long,
+            headers: lyftHeaders
+        };
+        // Holds the type of rides that fits the user profile
+        // Luxury and Group
+        var lyftRideTypes = [];
+        // Hold the Rides that fit the time 
+        var lyftRides = [];
+        // Send the request to lyft for products
+        // Find the best value
+        request(lyftOptions, function (error, response, info) {
+            if (error) {
+                console.log(error);
+                next();
+            }
+            console.log("In lyft Ride Types");
+            var body = JSON.parse(info);
+            for (var index = 0; index < body.ride_types.length; index++) {
+                var ride = body.ride_types[index];
+                if (perference == 2) {
+                    if (ride.display_name != "Lyft Line") {
+                        lyftRideTypes.push({
+                            ride_type: ride.ride_type,
+                            display_name: ride.display_name
+                        });
+                    }
+                }
+                if (group) {
+                    if (ride.seats > 4) {
+                        lyftRideTypes.push({
+                            ride_type: ride.ride_type,
+                            display_name: ride.display_name
+                        });
+                        continue;
+                    }
+                }
+                if (!group) {
+                    if (ride.seats < 5) {
+                        lyftRideTypes.push({
+                            ride_type: ride.ride_type,
+                            display_name: ride.display_name
+                        });
+                        continue;
+                    }
+                }
+            }
+            // Send the new request for Ride Pricing
+            var lyftHeaders = {
+                'Authorization': 'bearer ' + lyftClientId
+            };
+            var lyftOptions = {
+                url: 'https://api.lyft.com/v1/cost?start_lat=' + start_lat + '&start_lng=' + start_long + '&end_lat=' + end_lat + '&end_lng=' + end_long,
+                headers: lyftHeaders
+            };
+            // Send the request
+            request(lyftOptions, function (error, response, info) {
+                if (error) {
+                    console.log(error);
+                }
+                else {
+                    console.log("Have lyft prices");
+                    var body_2 = JSON.parse(info);
+                    // Lyft prices
+                    var lyft_price = 99999;
+                    var best_lyft_option_1 = {
+                        ride_type: "",
+                        estimated_duration_seconds: 0,
+                        estimated_distance_miles: 0,
+                        price: 0,
+                        primetime_percentage: "",
+                        driver_time: 0,
+                        display_name: ""
+                    };
+                    // Loop through each ride and match with previous information
+                    for (var index = 0; index < body_2.cost_estimates.length; index++) {
+                        var ride = body_2.cost_estimates[index];
+                        // Check to see if it matches the one based on group and luxury
+                        for (var e = 0; e < lyftRideTypes.length; e++) {
+                            if (ride.display_name == lyftRideTypes[e].display_name) {
+                                // add the price infor to the product array 
+                                lyftRides.push(ride);
                             }
-
-                        }) // end request for driver eta 
-
-                    } // end try
-
-                    catch (err)
-                    {
-                        session.send("An error occured while looking searching for Lyft in this location" +
-                        "Lyft may not be available in this area. Please check your location.");
-
-                    } // end catch
-
-                }); // end request to Lyft for Info
-
-            } // end else after initial request for token
-
-        }); // end request for token
-
-        next();
-    } ,
-
-    function (session, args, next)
-    {
-        session.sendBatch();
-
-        setTimeout(function() {
-            builder.Prompts.choice(session, "Want more info? Type the number",
-            "Transit|Uber|Lyft|Other");
-        }, 4000);
-        
+                        }
+                    }
+                    // Compares and find the cheapest price 
+                    for (var index = 0; index < lyftRides.length; index++) {
+                        // Holding variable to reference the ride
+                        var ride = lyftRides[index];
+                        // If index = 0 set the initial info to that
+                        if (index == 0) {
+                            lyft_price = ride.estimated_cost_cents_max;
+                            best_lyft_option_1 = {
+                                display_name: ride.display_name,
+                                price: ((ride.estimated_cost_cents_max + ride.estimated_cost_cents_min) / 120),
+                                estimated_distance_miles: ride.estimated_distance_miles,
+                                estimated_duration_seconds: ride.estimated_duration_seconds,
+                                primetime_percentage: ride.primetime_percentage,
+                                ride_type: ride.ride_type,
+                                driver_time: 0
+                            };
+                        }
+                        // If the ride is cheaper than the previous
+                        if (ride.estimated_cost_cents_max < lyft_price) {
+                            lyft_price = ride.estimated_cost_cents_max;
+                            best_lyft_option_1 = {
+                                display_name: ride.display_name,
+                                price: ((ride.estimated_cost_cents_max + ride.estimated_cost_cents_min) / 120),
+                                estimated_distance_miles: ride.estimated_distance_miles,
+                                estimated_duration_seconds: ride.estimated_duration_seconds,
+                                primetime_percentage: ride.primetime_percentage,
+                                ride_type: ride.ride_type,
+                                driver_time: 0
+                            };
+                        }
+                    }
+                    // Send the new request for Driver Times
+                    var lyftHeaders_1 = {
+                        'Authorization': 'bearer ' + lyftClientId
+                    };
+                    var lyftOptions_1 = {
+                        url: 'https://api.lyft.com/v1/eta?lat=' + start_lat + '&lng=' + start_long + '&ride_type=' + best_lyft_option_1.ride_type,
+                        headers: lyftHeaders_1
+                    };
+                    // Send the request for Driver times
+                    request(lyftOptions_1, function (error, response, info) {
+                        if (error) {
+                            console.log(error);
+                        }
+                        else {
+                            // Parse the JSON
+                            var body_3 = JSON.parse(info);
+                            // Set the Driver time
+                            best_lyft_option_1.driver_time = body_3.eta_estimates[0].eta_seconds;
+                            // Save the info to user data
+                            session.userData.Lyft = best_lyft_option_1;
+                        }
+                        lyftFlag = true;
+                        console.log("Finished Lyft Time");
+                    });
+                }
+                console.log("Finished Lyft Price");
+            });
+            console.log("Finished All of Lyft");
+        });
+        //=========================================================
+        // Car2Go information 
+        //=========================================================
+        console.log("Finished");
+        function Timeout(transit, uber, lyft, next) {
+            if (transit && uber && lyft) {
+                // Go to the aggregations
+                return next();
+            }
+            else {
+                setTimeout(function () {
+                    console.log("Waiting for information");
+                    return Timeout(transitFlag, uberFlag, lyftFlag, next);
+                }, 150);
+            }
+        }
+        ;
+        Timeout(transitFlag, uberFlag, lyftFlag, next);
     },
-
-    function (session, results, next) 
-    {
-        // check to see if results error
-
-        if (results.response.entity.toLowerCase() == "lyft" || 
-        results.response.index == 2)
-        {
-            session.beginDialog('/lyft');
+    //=========================================================
+    // Match with user perferences 
+    //=========================================================
+    function (session, response, next) {
+        console.log("Matching with user preference");
+        // Grab the user preference
+        var preference = session.userData.perference;
+        // Grab the infomation
+        var uber = session.userData.Uber;
+        var lyft = session.userData.Lyft;
+        var transitInfo = session.userData.Transit;
+        var rideshare = {
+            driverTime: "Error",
+            price: 'Error',
+            serviceProvider: "Error",
+            serviceType: "Error",
+            totalDistance: "Error",
+            totalTime: "Error",
+            proudctId: "Error"
+        };
+        console.log(uber);
+        console.log();
+        console.log(lyft);
+        console.log();
+        console.log(transitInfo);
+        // If the preference is for value
+        if (preference == 0) {
+            var uberPrice = uber.uber_price;
+            var lyftPrice = lyft.price;
+            // Find the lower price
+            if (uberPrice < lyftPrice) {
+                rideshare =
+                    {
+                        driverTime: (uber.uber_driver_time / 60).toPrecision(2),
+                        price: uberPrice.toPrecision(2),
+                        serviceProvider: "Uber",
+                        serviceType: uber.uber_name,
+                        totalDistance: uber.uber_distance.toPrecision(2),
+                        totalTime: (uber.uber_travel_time / 60).toPrecision(2),
+                        proudctId: uber.uber_productId
+                    };
+            }
+            else {
+                rideshare =
+                    {
+                        driverTime: (lyft.driver_time / 60).toPrecision(2),
+                        price: lyft.price.toPrecision(2),
+                        serviceProvider: "Lyft",
+                        serviceType: lyft.display_name,
+                        totalDistance: lyft.estimated_distance_miles.toPrecision(2),
+                        totalTime: (lyft.estimated_duration_seconds / 60).toPrecision(2),
+                        proudctId: lyft.ride_type
+                    };
+            }
         }
-
-        else if (results.response.entity.toLowerCase() == "uber" ||
-        results.response.index == 1)
-        {
-            session.beginDialog('/uber');
+        // If preference is for time
+        if (preference == 1) {
+            var uberDriverTime = uber.uber_driver_time;
+            var lyftDriverTime = lyft.driver_time;
+            if (uberDriverTime < lyftDriverTime) {
+                rideshare =
+                    {
+                        driverTime: (uber.uber_driver_time / 60).toPrecision(2),
+                        price: uber.uber_price.toPrecision(2),
+                        serviceProvider: "Uber",
+                        serviceType: uber.uber_name,
+                        totalDistance: uber.uber_distance.toPrecision(2),
+                        totalTime: (uber.uber_travel_time / 60).toPrecision(2),
+                        proudctId: uber.uber_productId
+                    };
+            }
+            else {
+                rideshare =
+                    {
+                        driverTime: (lyft.driver_time / 60).toPrecision(2),
+                        price: lyft.price.toPrecision(2),
+                        serviceProvider: "Lyft",
+                        serviceType: lyft.display_name,
+                        totalDistance: lyft.estimated_distance_miles.toPrecision(2),
+                        totalTime: (lyft.estimated_duration_seconds / 60).toPrecision(2),
+                        proudctId: lyft.ride_type
+                    };
+            }
         }
-
-        else if (results.response.entity.toLowerCase() == "transit" ||
-        results.response.index == 0)
-        {
-            session.beginDialog('/transit');
+        // Preference is for luxury
+        if (preference == 2) {
+            rideshare =
+                {
+                    driverTime: (uber.uber_driver_time / 60).toPrecision(2),
+                    price: uber.uber_price.toPrecision(2),
+                    serviceProvider: "Uber",
+                    serviceType: uber.uber_name,
+                    totalDistance: uber.uber_distance.toPrecision(2),
+                    totalTime: (uber.uber_travel_time / 60).toPrecision(2),
+                    proudctId: uber.uber_productId
+                };
         }
-        else
-        {
-            session.endDialog();
-            session.endConversation();
-        } 
+        // Build out the strings
+        var transitString = "Transit <br/>\n        - Departure Time: " + transitInfo.transitDepartureTime + " <br/>\n        - Arrival Time: " + transitInfo.transitArrivalTime + " <br/>\n        - Distance: " + transitInfo.transitDistance + " miles <br/>\n        - Duration " + transitInfo.transitDuration + " minutes <br/>";
+        var rideshareString = "Rideshare <br/>\n        - Service: " + rideshare.serviceProvider + " <br/>\n        - Ride Type: " + rideshare.serviceType + " <br/>\n        - Price: " + rideshare.price + " <br/>\n        - Driver Distance: " + rideshare.driverTime + " minutes away <br/>\n        - Total Distance: " + rideshare.totalDistance + " miles <br/>\n        - Total Duration: " + rideshare.totalTime + " minutes <br/>";
+        session.send(transitString + rideshareString);
+        // Add the options to the userdata
+        session.userData.Rideshare = rideshare;
+        session.replaceDialog("/options");
+    }
+]);
+// Dialogue for infomation 
+bot.dialog("/options", [
+    function (session) {
+        builder.Prompts.choice(session, "Type the number or name to order or get more info or hit finished", ["Transit", 'Rideshare', "Finished"]);
+    },
+    function (session, response, next) {
+        // Get the transit and rideshare options 
+        var transit = session.userData.Transit;
+        var rideshare = session.userData.Rideshare;
+        var startLat = session.userData.start_lat;
+        var startLong = session.userData.start_long;
+        var endLat = session.userData.end_lat;
+        var endLong = session.userData.end_long;
+        // User wants to see transit information
+        if (response.response.index == 0) {
+            // Array to Hold all direction string 
+            var directions = "";
+            for (var step = 0; step < transit.transitSteps.length; step++) {
+                // Check to see if walking or transit step
+                if (transit.transitSteps[step].stepTransitMode == "WALKING") {
+                    var walkingStep = transit.transitSteps[step];
+                    directions += walkingStep.stepMainInstruction + " <br/> \n                    - Distance: " + walkingStep.stepDistance + " <br/>\n                    - Duration: " + walkingStep.stepDuration + " <br/>\n                    ";
+                    for (var step_1 = 0; step_1 < walkingStep.stepDeatiledInstructions.length; step_1++) {
+                        if (step_1 == walkingStep.stepDeatiledInstructions.length - 1) {
+                            directions += "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction + " <br/>";
+                        }
+                        else {
+                            directions += "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction + " <br/> \n                   ";
+                        }
+                    }
+                }
+                else {
+                    var transitStep = transit.transitSteps[step];
+                    directions += transitStep.stepMainInstruction + " <br/>\n                    - Depature Name: " + transitStep.departureStopName + " <br/>\n                    - Deapture Time: " + transitStep.departureStopTime + " <br/>\n                    - Arrival Name: " + transitStep.arrivalStopName + " <br/>\n                    - Arrival Time: " + transitStep.arrivalStopTime + " <br/>\n                    - Distance: " + transitStep.stepDistance + " miles <br/>\n                    - Duration: " + transitStep.stepDuration + " minutes <br/>\n                    - Number of Stops: " + transitStep.numberOfStop + " <br/>\n                    - Vehicle Name: " + transitStep.vehicleName + " <br/>\n                    - Vehicle Type: " + transitStep.vehicleType + " <br/>";
+                }
+            }
+            session.send(directions);
+            // repeat the dialog
+            session.replaceDialog('/options');
+        }
+        else if (response.response.index == 1) {
+            // Check the rideshare service provider
+            if (rideshare.serviceProvider == "Uber") {
+                var uberClientId = '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP'; //process.env.UBER_APP_ID
+                // Format the addresses
+                var pickup = LocationAddressFomater(session.userData.start);
+                var dropoff = LocationAddressFomater(session.userData.end);
+                // Order the Uber
+                session.send("Or click the link to open the app and order your ride!");
+                var uberString = "'https://m.uber.com/ul/?action=setPickup&client_id=" + uberClientId + "&product_id=" + rideshare.proudctId + "&pickup[formatted_address]=" + pickup + "&pickup[latitude]=" + startLat + "&pickup[longitude]=" + startLong + "&dropoff[formatted_address]=" + dropoff + "&dropoff[latitude]=" + endLat + "&dropoff[longitude]=" + endLong;
+                session.send(uberString);
+            }
+            else if (rideshare.serviceProvider == 'Lyft') {
+                var clientId = 'gAAAAABZIPjkPxmPgs83bWslOmxyt26-4AFcNDYZOwXWj4gyu7NEjddtxNK0DeNOqRrIsOCjKF-16_NiqApbMT-5vtGXJaulRmRk6b6QqDpYyU0MGYojno-FKnn58KzWRPwfoqFF8MUA5LTP0FpoNScafNXOeSgdic1eWsoGQm6Kg5c7TyQviRQ=';
+                // Order the Lyft
+                session.send("Or click the link to open the app and order your ride!");
+                var lyftString = "https://lyft.com/ride?id=" + rideshare.proudctId + "&pickup[latitude]=" + startLat + "&partner=" + clientId + "&destination[latitude]=" + endLat + "&destination[longitude]=" + endLong;
+            }
+            // repeat the dialog
+            session.replaceDialog('/options');
+        }
+        else {
+            session.endConversation("Thank you for using Travelr! Have a great day!");
+        }
     }
 ]);
 
-bot.dialog('/lyft', [
 
-    function (session)
-    {   
-        // Tell the customer they are getting lyft information
-        session.send("Okay let me send you the information on Lyft")
-
-        // holding variable to loop through lyft_dialog
-        var ld;
-        
-        // local variable of the lyft information
-        var lyft_array = session.userData.lyft_array;
-
-        // loop through the array and its parts
-        for (var la in lyft_array)
-        {
-            // create a holding variable 
-            var lyft_string = "";
-
-            // loop through the objects within the array
-            for (var lp in lyft_array[la])
-            {
-                lyft_string += (lp + ": " + lyft_array[la][lp] + "-->" );
-            }
-
-            // send the information to the user 
-            session.send(lyft_string);
-        }
-
-        session.endDialog();
-    },
-
-    function (session)
-    {
-        session.endConversation();
-    }
-])
-
-bot.dialog('/uber', [
-    
-    function (session)
-    {
-        // Tell customer we are getting uber information
-        session.send("Okay let me send you the information on Uber")
-
-        // holding variable to loop through the Uber Dialogs
-        var ud;
-
-        // local variable to go through the array of strings
-        var uber_array = session.userData.uber_array;
-
-        // for loop to go through the array of strings
-        for (ud in uber_array)
-        {
-            var uber_string = "";
-
-            for (var ub in uber_array[ud])
-            {
-                uber_string += (ub + ": " + uber_array[ud][ub] + "--> ");
-            }
-
-            session.send(uber_string);
-        }
-
-        session.endDialog();
-    }
-])
-
-bot.dialog('/transit', [
-
-    function(session)
-    {
-        // Tell customer we are getting transit information
-        session.send("Okay let me send you the information on Transit")
-
-        // holding variable to loop through the Uber Dialogs
-        var gd;
-
-        // local variable to go through the array of strings
-        var google_array = session.userData.google_array;
-
-        // for loop to go through the array of strings
-        for (gd in google_array)
-        {
-            session.send(google_array[gd]);
-        }
-
-        session.endDialog();
-    }
-])

@@ -15,6 +15,7 @@ export declare namespace Results
         totalTime: string;
         serviceProvider: string;
         serviceType: string;
+        proudctId: string;
     }
     
     interface ICarshare

@@ -6,7 +6,7 @@ import {Uber} from "./uber";
 import {Lyft} from "./lyft";
 import {Results} from "./results";
 import {Transit} from "./transit";
-import * as util from "util"
+import * as process from "process";
 
 let googleMapsClient: any = googleMaps.createClient({
     key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' //process.env.GOOGLE_MAPS_KEY
@@ -56,6 +56,32 @@ function HtmlParse (html: string): string
     }
 
     return (html_return.replace(/  /g, " ").trim())
+}
+
+function LocationAddressFomater (address: string): string
+{
+    'pickup[formatted_address]=DFW%20Airport%2C%20Grapevine%2C%20TX%2C%20United%20States'
+
+    let addressSplit: string[] = address.split(" ");
+    let formattedAddress: string = '';
+
+    for (let index: number = 0; index < addressSplit.length; index++)
+    {
+        formattedAddress += (addressSplit[index]);
+
+        if (index < addressSplit.length - 1)
+        {
+            formattedAddress += '%20';
+        }
+
+        else
+        {
+            // add nothing 
+            continue;
+        }
+    }
+
+    return formattedAddress;
 }
 
 
@@ -142,7 +168,7 @@ bot.dialog('/', [
         // call the google maps function to get the coordinates 
         googleMapsClient.geocode(
             {
-                address: session.userData.start
+                address: result.response
             },
             function (err, response): void
             {
@@ -179,7 +205,7 @@ bot.dialog('/', [
     function(session: builder.Session, results: builder.IPromptTextResult, next: Function): void
     {
         console.log("Have the users desstination");
-        session.dialogData.end = results.response;
+        session.userData.end = results.response;
 
         // Call the google maps clinent
         googleMapsClient.geocode(
@@ -910,12 +936,15 @@ bot.dialog('/', [
 
         console.log("Finished");
         function Timeout(transit: boolean, uber: boolean, lyft: boolean, next: Function) {
-                if (transit && uber && lyft) {
+                if (transit && uber && lyft) 
+                {
                     // Go to the aggregations
                     return next();
                 }
-                else {
-                    setTimeout(function () {
+                else 
+                {
+                    setTimeout(function () 
+                    {
                         console.log("Waiting for information");
                         return Timeout(transitFlag, uberFlag, lyftFlag, next);
                     }, 150);
@@ -945,8 +974,9 @@ bot.dialog('/', [
             serviceProvider: "Error",
             serviceType: "Error",
             totalDistance: "Error",
-            totalTime: "Error"            
-        }
+            totalTime: "Error" ,
+            proudctId: "Error"           
+        };
 
         console.log(uber);
         console.log();
@@ -971,7 +1001,8 @@ bot.dialog('/', [
                     serviceProvider: "Uber",
                     serviceType : uber.uber_name,
                     totalDistance : uber.uber_distance.toPrecision(2),
-                    totalTime : (uber.uber_travel_time / 60).toPrecision(2)
+                    totalTime : (uber.uber_travel_time / 60).toPrecision(2),
+                    proudctId: uber.uber_productId
                 };
 
             }
@@ -984,7 +1015,8 @@ bot.dialog('/', [
                     serviceProvider: "Lyft",
                     serviceType : lyft.display_name,
                     totalDistance : lyft.estimated_distance_miles.toPrecision(2),
-                    totalTime : (lyft.estimated_duration_seconds / 60).toPrecision(2)
+                    totalTime : (lyft.estimated_duration_seconds / 60).toPrecision(2),
+                    proudctId: lyft.ride_type
                 };
 
             }
@@ -1005,7 +1037,8 @@ bot.dialog('/', [
                     serviceProvider: "Uber",
                     serviceType : uber.uber_name,
                     totalDistance : uber.uber_distance.toPrecision(2),
-                    totalTime : (uber.uber_travel_time / 60).toPrecision(2)
+                    totalTime : (uber.uber_travel_time / 60).toPrecision(2),
+                    proudctId: uber.uber_productId
                 };
             }
             else
@@ -1017,7 +1050,8 @@ bot.dialog('/', [
                     serviceProvider: "Lyft",
                     serviceType : lyft.display_name,
                     totalDistance : lyft.estimated_distance_miles.toPrecision(2),
-                    totalTime : (lyft.estimated_duration_seconds / 60).toPrecision(2)
+                    totalTime : (lyft.estimated_duration_seconds / 60).toPrecision(2),
+                    proudctId: lyft.ride_type
                 };
             }
         }
@@ -1032,7 +1066,8 @@ bot.dialog('/', [
                 serviceProvider: "Uber",
                 serviceType: uber.uber_name,
                 totalDistance: uber.uber_distance.toPrecision(2),
-                totalTime: (uber.uber_travel_time / 60).toPrecision(2)
+                totalTime: (uber.uber_travel_time / 60).toPrecision(2), 
+                proudctId: uber.uber_productId
             };
         }
 
@@ -1067,7 +1102,7 @@ bot.dialog("/options", [
 
     function (session: builder.Session): void
     {
-        builder.Prompts.choice(session, "Type the number or name to order or get more info",
+        builder.Prompts.choice(session, "Type the number or name to order or get more info or hit finished",
         ["Transit", 'Rideshare', "Finished"]);
     }, 
 
@@ -1076,6 +1111,10 @@ bot.dialog("/options", [
         // Get the transit and rideshare options 
         let transit: Transit.IFinalLegInfo = session.userData.Transit;
         let rideshare: Results.IRideshare = session.userData.Rideshare;
+        let startLat: string = session.userData.start_lat;
+        let startLong: string = session.userData.start_long;
+        let endLat: string = session.userData.end_lat; 
+        let endLong: string = session.userData.end_long;
 
         // User wants to see transit information
         if (response.response.index == 0)
@@ -1086,24 +1125,50 @@ bot.dialog("/options", [
             for (let step: number = 0; step < transit.transitSteps.length; step++) 
             {
                 // Check to see if walking or transit step
-                if ( transit.transitSteps[step].stepTransitMode == Transit.TransitOptions.WALKING.toString())
+                if ( transit.transitSteps[step].stepTransitMode == "WALKING")
                 {
                     let walkingStep: Transit.IStepWalkingInfo = transit.transitSteps[step] as Transit.IStepWalkingInfo;
 
-                    directions += walkingStep.stepMainInstruction + "<br/>";
+                    directions += `${walkingStep.stepMainInstruction} <br/> 
+                    - Distance: ${walkingStep.stepDistance} <br/>
+                    - Duration: ${walkingStep.stepDuration} <br/>
+                    `;
 
-                    walkingStep.stepDeatiledInstructions.forEach(detailedStep => 
+                    for (let step: number = 0; step < walkingStep.stepDeatiledInstructions.length; step++)
                     {
-                        directions += `- ${detailedStep.stepMainInstruction}`
-                    });
-                    
+                        if (step == walkingStep.stepDeatiledInstructions.length - 1)
+                        {
+                            directions += `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction} <br/>`;
+                        }
+                        else
+                        {
+                            directions += `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction} <br/> 
+                            `;
+                        }
+                    }
                 }
 
                 else
                 {
                     let transitStep: Transit.IStepTransitInfo = transit.transitSteps[step] as Transit.IStepTransitInfo;
+                    
+                    directions += `${transitStep.stepMainInstruction} <br/>
+                    - Depature Name: ${transitStep.departureStopName} <br/>
+                    - Deapture Time: ${transitStep.departureStopTime} <br/>
+                    - Arrival Name: ${transitStep.arrivalStopName} <br/>
+                    - Arrival Time: ${transitStep.arrivalStopTime} <br/>
+                    - Distance: ${transitStep.stepDistance} miles <br/>
+                    - Duration: ${transitStep.stepDuration} minutes <br/>
+                    - Number of Stops: ${transitStep.numberOfStop} <br/>
+                    - Vehicle Name: ${transitStep.vehicleName} <br/>
+                    - Vehicle Type: ${transitStep.vehicleType} <br/>`
                 }
             }
+
+            session.send(directions);
+
+            // repeat the dialog
+            session.replaceDialog('/options');
         }
 
         // User want ridesharing information
@@ -1112,13 +1177,30 @@ bot.dialog("/options", [
             // Check the rideshare service provider
             if (rideshare.serviceProvider == "Uber")
             {
+                let uberClientId: string = '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP' //process.env.UBER_APP_ID
+
+                // Format the addresses
+                let pickup: string = LocationAddressFomater(session.userData.start);
+                let dropoff: string = LocationAddressFomater(session.userData.end);
+
                 // Order the Uber
-            } 
+                session.send("Or click the link to open the app and order your ride!");
+
+                let uberString: string = `'https://m.uber.com/ul/?action=setPickup&client_id=${uberClientId}&product_id=${rideshare.proudctId}&pickup[formatted_address]=${pickup}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&dropoff[formatted_address]=${dropoff}&dropoff[latitude]=${endLat}&dropoff[longitude]=${endLong}`;
+                
+                session.send(uberString);
+        }   
 
             else if (rideshare.serviceProvider == 'Lyft')
             {
+                let clientId: string = 'gAAAAABZIPjkPxmPgs83bWslOmxyt26-4AFcNDYZOwXWj4gyu7NEjddtxNK0DeNOqRrIsOCjKF-16_NiqApbMT-5vtGXJaulRmRk6b6QqDpYyU0MGYojno-FKnn58KzWRPwfoqFF8MUA5LTP0FpoNScafNXOeSgdic1eWsoGQm6Kg5c7TyQviRQ=';
                 // Order the Lyft
+                session.send("Or click the link to open the app and order your ride!");
+                let lyftString: string = `https://lyft.com/ride?id=${rideshare.proudctId}&pickup[latitude]=${startLat}&partner=${clientId}&destination[latitude]=${endLat}&destination[longitude]=${endLong}`;
             }
+
+            // repeat the dialog
+            session.replaceDialog('/options');
         }
         // User is done with the conversation
         else

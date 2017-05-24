@@ -4,7 +4,7 @@ const builder = require("botbuilder");
 const restify = require("restify");
 const request = require("request");
 const googleMaps = require("@google/maps");
-const util = require("util");
+const process = require('process');
 
 var googleMapsClient = googleMaps.createClient({
     key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' //process.env.GOOGLE_MAPS_KEY
@@ -41,6 +41,22 @@ function HtmlParse(html) {
         html_return += html_array[i];
     }
     return (html_return.replace(/  /g, " ").trim());
+}
+function LocationAddressFomater(address) {
+    'pickup[formatted_address]=DFW%20Airport%2C%20Grapevine%2C%20TX%2C%20United%20States';
+    var addressSplit = address.split(" ");
+    var formattedAddress = '';
+    for (var index = 0; index < addressSplit.length; index++) {
+        formattedAddress += (addressSplit[index]);
+        if (index < addressSplit.length - 1) {
+            formattedAddress += '%20';
+        }
+        else {
+            // add nothing 
+            continue;
+        }
+    }
+    return formattedAddress;
 }
 //=========================================================
 // Bots Dialogs
@@ -103,7 +119,7 @@ bot.dialog('/', [
         session.userData.start = result.response;
         // call the google maps function to get the coordinates 
         googleMapsClient.geocode({
-            address: session.userData.start
+            address: result.response
         }, function (err, response) {
             if (!err) {
                 // Get and save the latitude
@@ -125,7 +141,7 @@ bot.dialog('/', [
     // Save the results 
     function (session, results, next) {
         console.log("Have the users desstination");
-        session.dialogData.end = results.response;
+        session.userData.end = results.response;
         // Call the google maps clinent
         googleMapsClient.geocode({
             address: results.response
@@ -663,7 +679,15 @@ bot.dialog('/', [
         var uber = session.userData.Uber;
         var lyft = session.userData.Lyft;
         var transitInfo = session.userData.Transit;
-        var rideshare;
+        var rideshare = {
+            driverTime: "Error",
+            price: 'Error',
+            serviceProvider: "Error",
+            serviceType: "Error",
+            totalDistance: "Error",
+            totalTime: "Error",
+            proudctId: "Error"
+        };
         console.log(uber);
         console.log();
         console.log(lyft);
@@ -682,7 +706,8 @@ bot.dialog('/', [
                         serviceProvider: "Uber",
                         serviceType: uber.uber_name,
                         totalDistance: uber.uber_distance.toPrecision(2),
-                        totalTime: (uber.uber_travel_time / 60).toPrecision(2)
+                        totalTime: (uber.uber_travel_time / 60).toPrecision(2),
+                        proudctId: uber.uber_productId
                     };
             }
             else {
@@ -693,7 +718,8 @@ bot.dialog('/', [
                         serviceProvider: "Lyft",
                         serviceType: lyft.display_name,
                         totalDistance: lyft.estimated_distance_miles.toPrecision(2),
-                        totalTime: (lyft.estimated_duration_seconds / 60).toPrecision(2)
+                        totalTime: (lyft.estimated_duration_seconds / 60).toPrecision(2),
+                        proudctId: lyft.ride_type
                     };
             }
         }
@@ -709,7 +735,8 @@ bot.dialog('/', [
                         serviceProvider: "Uber",
                         serviceType: uber.uber_name,
                         totalDistance: uber.uber_distance.toPrecision(2),
-                        totalTime: (uber.uber_travel_time / 60).toPrecision(2)
+                        totalTime: (uber.uber_travel_time / 60).toPrecision(2),
+                        proudctId: uber.uber_productId
                     };
             }
             else {
@@ -720,7 +747,8 @@ bot.dialog('/', [
                         serviceProvider: "Lyft",
                         serviceType: lyft.display_name,
                         totalDistance: lyft.estimated_distance_miles.toPrecision(2),
-                        totalTime: (lyft.estimated_duration_seconds / 60).toPrecision(2)
+                        totalTime: (lyft.estimated_duration_seconds / 60).toPrecision(2),
+                        proudctId: lyft.ride_type
                     };
             }
         }
@@ -733,13 +761,83 @@ bot.dialog('/', [
                     serviceProvider: "Uber",
                     serviceType: uber.uber_name,
                     totalDistance: uber.uber_distance.toPrecision(2),
-                    totalTime: (uber.uber_travel_time / 60).toPrecision(2)
+                    totalTime: (uber.uber_travel_time / 60).toPrecision(2),
+                    proudctId: uber.uber_productId
                 };
         }
         // Build out the strings
-        var transitString = "Transit <br/>\n        - Depature Time: " + transitInfo.transitDepartureTime + " <br/>\n        - Arrival Time: " + transitInfo.transitArrivalTime + " <br/>\n        - Distance: " + transitInfo.transitDistance + " <br/>\n        - Duration " + transitInfo.transitDuration + " <br/>";
-        var rideshareString = "Rideshare <br/>\n        - Service: " + rideshare.serviceProvider + " <br/>\n        - Ride Type: " + rideshare.serviceType + " <br/>\n        - Price: " + rideshare.price + " <br/>\n        - Driver Distance " + rideshare.driverTime + " minutes away <br/>\n        - Total Distance " + rideshare.totalDistance + " <br/>\n        - Total Duration: " + rideshare.totalTime + " minutes <br/>";
+        var transitString = "Transit <br/>\n        - Departure Time: " + transitInfo.transitDepartureTime + " <br/>\n        - Arrival Time: " + transitInfo.transitArrivalTime + " <br/>\n        - Distance: " + transitInfo.transitDistance + " miles <br/>\n        - Duration " + transitInfo.transitDuration + " minutes <br/>";
+        var rideshareString = "Rideshare <br/>\n        - Service: " + rideshare.serviceProvider + " <br/>\n        - Ride Type: " + rideshare.serviceType + " <br/>\n        - Price: " + rideshare.price + " <br/>\n        - Driver Distance: " + rideshare.driverTime + " minutes away <br/>\n        - Total Distance: " + rideshare.totalDistance + " miles <br/>\n        - Total Duration: " + rideshare.totalTime + " minutes <br/>";
         session.send(transitString + rideshareString);
+        // Add the options to the userdata
+        session.userData.Rideshare = rideshare;
+        session.replaceDialog("/options");
+    }
+]);
+// Dialogue for infomation 
+bot.dialog("/options", [
+    function (session) {
+        builder.Prompts.choice(session, "Type the number or name to order or get more info or hit finished", ["Transit", 'Rideshare', "Finished"]);
+    },
+    function (session, response, next) {
+        // Get the transit and rideshare options 
+        var transit = session.userData.Transit;
+        var rideshare = session.userData.Rideshare;
+        var startLat = session.userData.start_lat;
+        var startLong = session.userData.start_long;
+        var endLat = session.userData.end_lat;
+        var endLong = session.userData.end_long;
+        // User wants to see transit information
+        if (response.response.index == 0) {
+            // Array to Hold all direction string 
+            var directions = "";
+            for (var step = 0; step < transit.transitSteps.length; step++) {
+                // Check to see if walking or transit step
+                if (transit.transitSteps[step].stepTransitMode == "WALKING") {
+                    var walkingStep = transit.transitSteps[step];
+                    directions += walkingStep.stepMainInstruction + " <br/> \n                    - Distance: " + walkingStep.stepDistance + " <br/>\n                    - Duration: " + walkingStep.stepDuration + " <br/>\n                    ";
+                    for (var step_1 = 0; step_1 < walkingStep.stepDeatiledInstructions.length; step_1++) {
+                        if (step_1 == walkingStep.stepDeatiledInstructions.length - 1) {
+                            directions += "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction + " <br/>";
+                        }
+                        else {
+                            directions += "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction + " <br/> \n                   ";
+                        }
+                    }
+                }
+                else {
+                    var transitStep = transit.transitSteps[step];
+                    directions += transitStep.stepMainInstruction + " <br/>\n                    - Depature Name: " + transitStep.departureStopName + " <br/>\n                    - Deapture Time: " + transitStep.departureStopTime + " <br/>\n                    - Arrival Name: " + transitStep.arrivalStopName + " <br/>\n                    - Arrival Time: " + transitStep.arrivalStopTime + " <br/>\n                    - Distance: " + transitStep.stepDistance + " miles <br/>\n                    - Duration: " + transitStep.stepDuration + " minutes <br/>\n                    - Number of Stops: " + transitStep.numberOfStop + " <br/>\n                    - Vehicle Name: " + transitStep.vehicleName + " <br/>\n                    - Vehicle Type: " + transitStep.vehicleType + " <br/>";
+                }
+            }
+            session.send(directions);
+            // repeat the dialog
+            session.replaceDialog('/options');
+        }
+        else if (response.response.index == 1) {
+            // Check the rideshare service provider
+            if (rideshare.serviceProvider == "Uber") {
+                var uberClientId = '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP'; //process.env.UBER_APP_ID
+                // Format the addresses
+                var pickup = LocationAddressFomater(session.userData.start);
+                var dropoff = LocationAddressFomater(session.userData.end);
+                // Order the Uber
+                session.send("Or click the link to open the app and order your ride!");
+                var uberString = "'https://m.uber.com/ul/?action=setPickup&client_id=" + uberClientId + "&product_id=" + rideshare.proudctId + "&pickup[formatted_address]=" + pickup + "&pickup[latitude]=" + startLat + "&pickup[longitude]=" + startLong + "&dropoff[formatted_address]=" + dropoff + "&dropoff[latitude]=" + endLat + "&dropoff[longitude]=" + endLong;
+                session.send(uberString);
+            }
+            else if (rideshare.serviceProvider == 'Lyft') {
+                var clientId = 'gAAAAABZIPjkPxmPgs83bWslOmxyt26-4AFcNDYZOwXWj4gyu7NEjddtxNK0DeNOqRrIsOCjKF-16_NiqApbMT-5vtGXJaulRmRk6b6QqDpYyU0MGYojno-FKnn58KzWRPwfoqFF8MUA5LTP0FpoNScafNXOeSgdic1eWsoGQm6Kg5c7TyQviRQ=';
+                // Order the Lyft
+                session.send("Or click the link to open the app and order your ride!");
+                var lyftString = "https://lyft.com/ride?id=" + rideshare.proudctId + "&pickup[latitude]=" + startLat + "&partner=" + clientId + "&destination[latitude]=" + endLat + "&destination[longitude]=" + endLong;
+            }
+            // repeat the dialog
+            session.replaceDialog('/options');
+        }
+        else {
+            session.endConversation("Thank you for using Travelr! Have a great day!");
+        }
     }
 ]);
 

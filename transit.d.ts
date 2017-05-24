@@ -205,6 +205,7 @@ export declare namespace Transit {
         vehicleName: string;
     }
 
+    export enum TransitOptions {WALKING, TRANSIT}
 
 }
 

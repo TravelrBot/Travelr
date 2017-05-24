@@ -1056,24 +1056,57 @@ bot.dialog('/', [
         // Add the options to the userdata
         session.userData.Rideshare = rideshare;
 
-        builder.Prompts.choice(session, "Type the number or name to order or get more info", [
-            "Transit",
-            "Rideshare"
-        ]);
+        session.replaceDialog("/options");
 
-    },
+    }
 
-    function(session: builder.Session, response: builder.IPromptChoiceResult, next: Function)
+])  
+
+// Dialogue for infomation 
+bot.dialog("/options", [
+
+    function (session: builder.Session): void
+    {
+        builder.Prompts.choice(session, "Type the number or name to order or get more info",
+        ["Transit", 'Rideshare', "Finished"]);
+    }, 
+
+    function(session: builder.Session, response: builder.IPromptChoiceResult, next)
     {
         // Get the transit and rideshare options 
         let transit: Transit.IFinalLegInfo = session.userData.Transit;
         let rideshare: Results.IRideshare = session.userData.Rideshare;
 
+        // User wants to see transit information
         if (response.response.index == 0)
         {
+            // Array to Hold all direction string 
+            let directions: string = "";
 
+            for (let step: number = 0; step < transit.transitSteps.length; step++) 
+            {
+                // Check to see if walking or transit step
+                if ( transit.transitSteps[step].stepTransitMode == Transit.TransitOptions.WALKING.toString())
+                {
+                    let walkingStep: Transit.IStepWalkingInfo = transit.transitSteps[step] as Transit.IStepWalkingInfo;
+
+                    directions += walkingStep.stepMainInstruction + "<br/>";
+
+                    walkingStep.stepDeatiledInstructions.forEach(detailedStep => 
+                    {
+                        directions += `- ${detailedStep.stepMainInstruction}`
+                    });
+                    
+                }
+
+                else
+                {
+                    let transitStep: Transit.IStepTransitInfo = transit.transitSteps[step] as Transit.IStepTransitInfo;
+                }
+            }
         }
 
+        // User want ridesharing information
         else if (response.response.index == 1)
         {
             // Check the rideshare service provider
@@ -1087,6 +1120,10 @@ bot.dialog('/', [
                 // Order the Lyft
             }
         }
+        // User is done with the conversation
+        else
+        {
+            session.endConversation("Thank you for using Travelr! Have a great day!");
+        }     
     }
-
-    ])  
+])

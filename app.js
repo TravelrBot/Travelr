@@ -795,19 +795,19 @@ bot.dialog("/options", [
                 // Check to see if walking or transit step
                 if (transit.transitSteps[step].stepTransitMode == "WALKING") {
                     var walkingStep = transit.transitSteps[step];
-                    directions += walkingStep.stepMainInstruction + " <br/> \n                    - Distance: " + walkingStep.stepDistance + " <br/>\n                    - Duration: " + walkingStep.stepDuration + " <br/>\n                    ";
+                    directions += walkingStep.stepMainInstruction + " <br/> \n        - Distance: " + walkingStep.stepDistance + " <br/>\n        - Duration: " + walkingStep.stepDuration + " <br/>\n        ";
                     for (var step_1 = 0; step_1 < walkingStep.stepDeatiledInstructions.length; step_1++) {
                         if (step_1 == walkingStep.stepDeatiledInstructions.length - 1) {
                             directions += "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction + " <br/>";
                         }
                         else {
-                            directions += "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction + " <br/> \n                   ";
+                            directions += "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction + " <br/> \n        ";
                         }
                     }
                 }
                 else {
                     var transitStep = transit.transitSteps[step];
-                    directions += transitStep.stepMainInstruction + " <br/>\n                    - Depature Name: " + transitStep.departureStopName + " <br/>\n                    - Deapture Time: " + transitStep.departureStopTime + " <br/>\n                    - Arrival Name: " + transitStep.arrivalStopName + " <br/>\n                    - Arrival Time: " + transitStep.arrivalStopTime + " <br/>\n                    - Distance: " + transitStep.stepDistance + " miles <br/>\n                    - Duration: " + transitStep.stepDuration + " minutes <br/>\n                    - Number of Stops: " + transitStep.numberOfStop + " <br/>\n                    - Vehicle Name: " + transitStep.vehicleName + " <br/>\n                    - Vehicle Type: " + transitStep.vehicleType + " <br/>";
+                    directions += transitStep.stepMainInstruction + " <br/>\n        - Depature Name: " + transitStep.departureStopName + " <br/>\n        - Deapture Time: " + transitStep.departureStopTime + " <br/>\n        - Arrival Name: " + transitStep.arrivalStopName + " <br/>\n        - Arrival Time: " + transitStep.arrivalStopTime + " <br/>\n        - Distance: " + transitStep.stepDistance + " miles <br/>\n        - Duration: " + transitStep.stepDuration + " minutes <br/>\n        - Number of Stops: " + transitStep.numberOfStop + " <br/>\n        - Vehicle Name: " + transitStep.vehicleName + " <br/>\n        - Vehicle Type: " + transitStep.vehicleType + " <br/>";
                 }
             }
             session.send(directions);

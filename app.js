@@ -26,6 +26,7 @@ server.get(/.*/, restify.serveStatic({
     'directory': '.',
     'default': 'Index.html'
 }));
+
 function HtmlParse(html) {
     html += " ";
     var html_array = html.split("");
@@ -358,142 +359,182 @@ bot.dialog('/', [
             headers: headers
         };
         request(options, function (error, response, info) {
-            if (error) {
+            if (error || response.statusCode == 400) {
                 // TODO: skip over uber
                 console.log("Error when getting uber info");
-                next();
-            }
-            var body = JSON.parse(info);
-            console.log("Got Uber Product info");
-            for (var index = 0; index < body.products.length; index++) {
-                var ride = body.products[index];
-                if (perference == 2) {
-                    if (ride.display_name == "SELECT" || ride.display_name == "BLACK" || ride.display_name == "SUV") {
-                        rides.push({ display_name: ride.display_name });
-                    }
-                }
-                if (group) {
-                    if (ride.capacity > 4) {
-                        rides.push({ display_name: ride.display_name });
-                        continue;
-                    }
-                }
-                if (!group) {
-                    if (ride.capacity < 5) {
-                        rides.push({ display_name: ride.display_name });
-                        continue;
-                    }
-                }
-            }
-            // Send the request for Prices
-            // Set the headers 
-            headers = {
-                'Authorization': 'Token ' + server_token,
-                'Content-Type': 'application/json',
-                'Accept-Language': 'en_EN'
-            };
-            // Set the options 
-            options = {
-                url: 'https://api.uber.com/v1.2/estimates/price?start_latitude=' + start_lat + '&start_longitude=' + start_long + '&end_latitude=' + end_lat + '&end_longitude=' + end_long,
-                method: 'GET',
-                headers: headers
-            };
-            // Make the request 
-            request(options, function (error, response, info) {
-                var body = JSON.parse(info);
-                var product = [];
-                // Set variables to hold the infomration
-                var uber_price = 99999;
+                console.log(error);
+                console.log(response.statusCode);
                 var best_uber_option = {
-                    uber_distance: 0,
-                    uber_driver_time: 0,
-                    uber_name: "",
-                    uber_price: 0,
-                    uber_productId: "",
-                    uber_travel_time: 0
+                    uber_distance: Number.MAX_SAFE_INTEGER,
+                    uber_driver_time: Number.MAX_SAFE_INTEGER,
+                    uber_name: "Error",
+                    uber_price: Number.MAX_SAFE_INTEGER,
+                    uber_productId: "Error",
+                    uber_travel_time: Number.MAX_SAFE_INTEGER
                 };
-                // Check to see if error 
-                if (error) {
-                    // Log the error
-                    console.log(error);
+                uberFlag = true;
+                // Set the User data
+                session.userData.Uber = best_uber_option;
+            }
+            else {
+                var body = JSON.parse(info);
+                console.log("Got Uber Product info");
+                for (var index = 0; index < body.products.length; index++) {
+                    var ride = body.products[index];
+                    if (perference == 2) {
+                        if (ride.display_name == "SELECT" || ride.display_name == "BLACK" || ride.display_name == "SUV") {
+                            rides.push({ display_name: ride.display_name });
+                        }
+                    }
+                    if (group) {
+                        if (ride.capacity > 4) {
+                            rides.push({ display_name: ride.display_name });
+                            continue;
+                        }
+                    }
+                    if (!group) {
+                        if (ride.capacity < 5) {
+                            rides.push({ display_name: ride.display_name });
+                            continue;
+                        }
+                    }
                 }
-                else {
-                    console.log("Have Uber prices");
-                    // Loop through each ride and match with product information 
-                    for (var index = 0; index < body.prices.length; index++) {
-                        var ride = body.prices[index];
-                        // Check to see if the product matches the terms already
-                        for (var e = 0; e < rides.length; e++) {
-                            if (ride.display_name == rides[e].display_name) {
-                                // Add the price info to the product array
-                                product.push(ride);
+                // Send the request for Prices
+                // Set the headers 
+                headers = {
+                    'Authorization': 'Token ' + server_token,
+                    'Content-Type': 'application/json',
+                    'Accept-Language': 'en_EN'
+                };
+                // Set the options 
+                options = {
+                    url: 'https://api.uber.com/v1.2/estimates/price?start_latitude=' + start_lat + '&start_longitude=' + start_long + '&end_latitude=' + end_lat + '&end_longitude=' + end_long,
+                    method: 'GET',
+                    headers: headers
+                };
+                // Make the request 
+                request(options, function (error, response, info) {
+                    var body = JSON.parse(info);
+                    var product = [];
+                    // Set variables to hold the infomration
+                    var uber_price = 99999;
+                    var best_uber_option = {
+                        uber_distance: 0,
+                        uber_driver_time: 0,
+                        uber_name: "",
+                        uber_price: 0,
+                        uber_productId: "",
+                        uber_travel_time: 0
+                    };
+                    // Check to see if error 
+                    if (error || response.statusCode == 400) {
+                        // Log the error
+                        console.log(error);
+                        console.log(response.statusCode);
+                        console.log("Not able to find pricing info");
+                        var best_uber_option_1 = {
+                            uber_distance: Number.MAX_SAFE_INTEGER,
+                            uber_driver_time: Number.MAX_SAFE_INTEGER,
+                            uber_name: "Error",
+                            uber_price: Number.MAX_SAFE_INTEGER,
+                            uber_productId: "Error",
+                            uber_travel_time: Number.MAX_SAFE_INTEGER
+                        };
+                        uberFlag = true;
+                        // Set the User data
+                        session.userData.Uber = best_uber_option_1;
+                    }
+                    else {
+                        console.log("Have Uber prices");
+                        // Loop through each ride and match with product information 
+                        for (var index = 0; index < body.prices.length; index++) {
+                            var ride = body.prices[index];
+                            // Check to see if the product matches the terms already
+                            for (var e = 0; e < rides.length; e++) {
+                                if (ride.display_name == rides[e].display_name) {
+                                    // Add the price info to the product array
+                                    product.push(ride);
+                                }
                             }
                         }
+                        // Now compare and find the cheapest price 
+                        for (var index = 0; index < product.length; index++) {
+                            // Create a holding variable
+                            var ride = product[index];
+                            // If index is 0 set the base price to that index
+                            if (index == 0) {
+                                // Change the pricing informaiton
+                                uber_price = ride.high_estimate;
+                                // Set the variable
+                                best_uber_option = {
+                                    uber_distance: ride.distance,
+                                    uber_driver_time: 0,
+                                    uber_name: ride.display_name,
+                                    uber_price: (ride.high_estimate + ride.low_estimate) / 2,
+                                    uber_productId: ride.product_id,
+                                    uber_travel_time: ride.duration
+                                };
+                            }
+                            if (uber_price > ride.high_estimate) {
+                                uber_price = ride.high_estimate;
+                                // Set the variable
+                                best_uber_option = {
+                                    uber_distance: parseFloat(ride.display_name),
+                                    uber_driver_time: 0,
+                                    uber_name: ride.display_name,
+                                    uber_price: (ride.high_estimate + ride.low_estimate) / 2,
+                                    uber_productId: ride.product_id,
+                                    uber_travel_time: ride.duration
+                                };
+                            }
+                        }
+                        // Send the request for Times
+                        // Set the headers 
+                        headers = {
+                            'Authorization': 'Token ' + server_token,
+                            'Content-Type': 'application/json',
+                            'Accept-Language': 'en_EN'
+                        };
+                        // Set the options 
+                        options = {
+                            url: 'https://api.uber.com/v1.2/estimates/time?start_latitude=' + start_lat + '&start_longitude=' + start_long + '&product_id=' + best_uber_option.uber_productId,
+                            method: 'GET',
+                            headers: headers
+                        };
+                        // Send the request for the time
+                        request(options, function (error, response, info) {
+                            if (error || response.statusCode != 200 || info.times == [] || info.times == null) {
+                                console.log(error);
+                                console.log(response.statusCode);
+                                console.log("Unable to find drivers");
+                                var best_uber_option_2 = {
+                                    uber_distance: Number.MAX_SAFE_INTEGER,
+                                    uber_driver_time: Number.MAX_SAFE_INTEGER,
+                                    uber_name: "Error",
+                                    uber_price: Number.MAX_SAFE_INTEGER,
+                                    uber_productId: "Error",
+                                    uber_travel_time: Number.MAX_SAFE_INTEGER
+                                };
+                                uberFlag = true;
+                                // Set the User data
+                                session.userData.Uber = best_uber_option_2;
+                            }
+                            else {
+                                console.log("Have driver times");
+                                // Parse the string into json
+                                var body_1 = JSON.parse(info);
+                                best_uber_option.uber_driver_time = body_1.times[0].estimate;
+                                // Set the User data
+                                session.userData.Uber = best_uber_option;
+                            }
+                            uberFlag = true;
+                            console.log("Finished Uber Driver Time");
+                        });
+                        console.log("Finished Uber Price");
                     }
-                    // Now compare and find the cheapest price 
-                    for (var index = 0; index < product.length; index++) {
-                        // Create a holding variable
-                        var ride = product[index];
-                        // If index is 0 set the base price to that index
-                        if (index == 0) {
-                            // Change the pricing informaiton
-                            uber_price = ride.high_estimate;
-                            // Set the variable
-                            best_uber_option = {
-                                uber_distance: ride.distance,
-                                uber_driver_time: 0,
-                                uber_name: ride.display_name,
-                                uber_price: (ride.high_estimate + ride.low_estimate) / 2,
-                                uber_productId: ride.product_id,
-                                uber_travel_time: ride.duration
-                            };
-                        }
-                        if (uber_price > ride.high_estimate) {
-                            uber_price = ride.high_estimate;
-                            // Set the variable
-                            best_uber_option = {
-                                uber_distance: parseFloat(ride.display_name),
-                                uber_driver_time: 0,
-                                uber_name: ride.display_name,
-                                uber_price: (ride.high_estimate + ride.low_estimate) / 2,
-                                uber_productId: ride.product_id,
-                                uber_travel_time: ride.duration
-                            };
-                        }
-                    }
-                    // Send the request for Times
-                    // Set the headers 
-                    headers = {
-                        'Authorization': 'Token ' + server_token,
-                        'Content-Type': 'application/json',
-                        'Accept-Language': 'en_EN'
-                    };
-                    // Set the options 
-                    options = {
-                        url: 'https://api.uber.com/v1.2/estimates/time?start_latitude=' + start_lat + '&start_longitude=' + start_long + '&product_id=' + best_uber_option.uber_productId,
-                        method: 'GET',
-                        headers: headers
-                    };
-                    // Send the request for the time
-                    request(options, function (error, response, info) {
-                        if (error) {
-                            console.log(error);
-                        }
-                        else {
-                            console.log("Have driver times");
-                            // Parse the string into json
-                            var body_1 = JSON.parse(info);
-                            best_uber_option.uber_driver_time = body_1.times[0].estimate;
-                            // Set the User data
-                            session.userData.Uber = best_uber_option;
-                        }
-                        uberFlag = true;
-                        console.log("Finished Uber Driver Time");
-                    });
-                }
-                console.log("Finished Uber Price");
-            });
-            console.log("Finished Uber Products Maps");
+                });
+                console.log("Finished Uber Products");
+            }
         });
         //=========================================================
         // Lyft information 
@@ -516,138 +557,179 @@ bot.dialog('/', [
         // Send the request to lyft for products
         // Find the best value
         request(lyftOptions, function (error, response, info) {
-            if (error) {
+            if (error || response.statusCode != 200) {
                 console.log(error);
-                next();
+                console.log(response.statusCode);
+                console.log("Cannot find products");
+                var best_lyft_option = {
+                    display_name: "Error",
+                    driver_time: Number.MAX_SAFE_INTEGER,
+                    estimated_distance_miles: Number.MAX_SAFE_INTEGER,
+                    estimated_duration_seconds: Number.MAX_SAFE_INTEGER,
+                    price: Number.MAX_SAFE_INTEGER,
+                    primetime_percentage: "Error",
+                    ride_type: "Error"
+                };
+                lyftFlag = true;
+                // Save the info to user data
+                session.userData.Lyft = best_lyft_option;
             }
-            console.log("In lyft Ride Types");
-            var body = JSON.parse(info);
-            for (var index = 0; index < body.ride_types.length; index++) {
-                var ride = body.ride_types[index];
-                if (perference == 2) {
-                    if (ride.display_name != "Lyft Line") {
-                        lyftRideTypes.push({
-                            ride_type: ride.ride_type,
-                            display_name: ride.display_name
-                        });
+            else {
+                console.log("In lyft Ride Types");
+                var body = JSON.parse(info);
+                for (var index = 0; index < body.ride_types.length; index++) {
+                    var ride = body.ride_types[index];
+                    if (perference == 2) {
+                        if (ride.display_name != "Lyft Line") {
+                            lyftRideTypes.push({
+                                ride_type: ride.ride_type,
+                                display_name: ride.display_name
+                            });
+                        }
+                    }
+                    if (group) {
+                        if (ride.seats > 4) {
+                            lyftRideTypes.push({
+                                ride_type: ride.ride_type,
+                                display_name: ride.display_name
+                            });
+                            continue;
+                        }
+                    }
+                    if (!group) {
+                        if (ride.seats < 5) {
+                            lyftRideTypes.push({
+                                ride_type: ride.ride_type,
+                                display_name: ride.display_name
+                            });
+                            continue;
+                        }
                     }
                 }
-                if (group) {
-                    if (ride.seats > 4) {
-                        lyftRideTypes.push({
-                            ride_type: ride.ride_type,
-                            display_name: ride.display_name
-                        });
-                        continue;
+                // Send the new request for Ride Pricing
+                var lyftHeaders_1 = {
+                    'Authorization': 'bearer ' + lyftClientId
+                };
+                var lyftOptions_1 = {
+                    url: 'https://api.lyft.com/v1/cost?start_lat=' + start_lat + '&start_lng=' + start_long + '&end_lat=' + end_lat + '&end_lng=' + end_long,
+                    headers: lyftHeaders_1
+                };
+                // Send the request
+                request(lyftOptions_1, function (error, response, info) {
+                    if (error || response.statusCode == 400) {
+                        console.log(error);
+                        console.log(response.statusCode);
+                        var best_lyft_option = {
+                            display_name: "Error",
+                            driver_time: Number.MAX_SAFE_INTEGER,
+                            estimated_distance_miles: Number.MAX_SAFE_INTEGER,
+                            estimated_duration_seconds: Number.MAX_SAFE_INTEGER,
+                            price: Number.MAX_SAFE_INTEGER,
+                            primetime_percentage: "Error",
+                            ride_type: "Error"
+                        };
+                        lyftFlag = true;
+                        // Save the info to user data
+                        session.userData.Lyft = best_lyft_option;
                     }
-                }
-                if (!group) {
-                    if (ride.seats < 5) {
-                        lyftRideTypes.push({
-                            ride_type: ride.ride_type,
-                            display_name: ride.display_name
-                        });
-                        continue;
-                    }
-                }
-            }
-            // Send the new request for Ride Pricing
-            var lyftHeaders = {
-                'Authorization': 'bearer ' + lyftClientId
-            };
-            var lyftOptions = {
-                url: 'https://api.lyft.com/v1/cost?start_lat=' + start_lat + '&start_lng=' + start_long + '&end_lat=' + end_lat + '&end_lng=' + end_long,
-                headers: lyftHeaders
-            };
-            // Send the request
-            request(lyftOptions, function (error, response, info) {
-                if (error) {
-                    console.log(error);
-                }
-                else {
-                    console.log("Have lyft prices");
-                    var body_2 = JSON.parse(info);
-                    // Lyft prices
-                    var lyft_price = 99999;
-                    var best_lyft_option_1 = {
-                        ride_type: "",
-                        estimated_duration_seconds: 0,
-                        estimated_distance_miles: 0,
-                        price: 0,
-                        primetime_percentage: "",
-                        driver_time: 0,
-                        display_name: ""
-                    };
-                    // Loop through each ride and match with previous information
-                    for (var index = 0; index < body_2.cost_estimates.length; index++) {
-                        var ride = body_2.cost_estimates[index];
-                        // Check to see if it matches the one based on group and luxury
-                        for (var e = 0; e < lyftRideTypes.length; e++) {
-                            if (ride.display_name == lyftRideTypes[e].display_name) {
-                                // add the price infor to the product array 
-                                lyftRides.push(ride);
+                    else {
+                        console.log("Have lyft prices");
+                        var body_2 = JSON.parse(info);
+                        // Lyft prices
+                        var lyft_price = 99999;
+                        var best_lyft_option_1 = {
+                            ride_type: "",
+                            estimated_duration_seconds: 0,
+                            estimated_distance_miles: 0,
+                            price: 0,
+                            primetime_percentage: "",
+                            driver_time: 0,
+                            display_name: ""
+                        };
+                        // Loop through each ride and match with previous information
+                        for (var index = 0; index < body_2.cost_estimates.length; index++) {
+                            var ride = body_2.cost_estimates[index];
+                            // Check to see if it matches the one based on group and luxury
+                            for (var e = 0; e < lyftRideTypes.length; e++) {
+                                if (ride.display_name == lyftRideTypes[e].display_name) {
+                                    // add the price infor to the product array 
+                                    lyftRides.push(ride);
+                                }
                             }
                         }
+                        // Compares and find the cheapest price 
+                        for (var index = 0; index < lyftRides.length; index++) {
+                            // Holding variable to reference the ride
+                            var ride = lyftRides[index];
+                            // If index = 0 set the initial info to that
+                            if (index == 0) {
+                                lyft_price = ride.estimated_cost_cents_max;
+                                best_lyft_option_1 = {
+                                    display_name: ride.display_name,
+                                    price: ((ride.estimated_cost_cents_max + ride.estimated_cost_cents_min) / 120),
+                                    estimated_distance_miles: ride.estimated_distance_miles,
+                                    estimated_duration_seconds: ride.estimated_duration_seconds,
+                                    primetime_percentage: ride.primetime_percentage,
+                                    ride_type: ride.ride_type,
+                                    driver_time: 0
+                                };
+                            }
+                            // If the ride is cheaper than the previous
+                            if (ride.estimated_cost_cents_max < lyft_price) {
+                                lyft_price = ride.estimated_cost_cents_max;
+                                best_lyft_option_1 = {
+                                    display_name: ride.display_name,
+                                    price: ((ride.estimated_cost_cents_max + ride.estimated_cost_cents_min) / 120),
+                                    estimated_distance_miles: ride.estimated_distance_miles,
+                                    estimated_duration_seconds: ride.estimated_duration_seconds,
+                                    primetime_percentage: ride.primetime_percentage,
+                                    ride_type: ride.ride_type,
+                                    driver_time: 0
+                                };
+                            }
+                        }
+                        // Send the new request for Driver Times
+                        var lyftHeaders_2 = {
+                            'Authorization': 'bearer ' + lyftClientId
+                        };
+                        var lyftOptions_2 = {
+                            url: 'https://api.lyft.com/v1/eta?lat=' + start_lat + '&lng=' + start_long + '&ride_type=' + best_lyft_option_1.ride_type,
+                            headers: lyftHeaders_2
+                        };
+                        // Send the request for Driver times
+                        request(lyftOptions_2, function (error, response, info) {
+                            if (error || response.statusCode == 400) {
+                                console.log(error);
+                                console.log(response.statusCode);
+                                var best_lyft_option_2 = {
+                                    display_name: "Error",
+                                    driver_time: Number.MAX_SAFE_INTEGER,
+                                    estimated_distance_miles: Number.MAX_SAFE_INTEGER,
+                                    estimated_duration_seconds: Number.MAX_SAFE_INTEGER,
+                                    price: Number.MAX_SAFE_INTEGER,
+                                    primetime_percentage: "Error",
+                                    ride_type: "Error"
+                                };
+                                lyftFlag = true;
+                                // Save the info to user data
+                                session.userData.Lyft = best_lyft_option_2;
+                            }
+                            else {
+                                // Parse the JSON
+                                var body_3 = JSON.parse(info);
+                                // Set the Driver time
+                                best_lyft_option_1.driver_time = body_3.eta_estimates[0].eta_seconds;
+                                // Save the info to user data
+                                session.userData.Lyft = best_lyft_option_1;
+                            }
+                            lyftFlag = true;
+                            console.log("Finished Lyft Time");
+                        });
                     }
-                    // Compares and find the cheapest price 
-                    for (var index = 0; index < lyftRides.length; index++) {
-                        // Holding variable to reference the ride
-                        var ride = lyftRides[index];
-                        // If index = 0 set the initial info to that
-                        if (index == 0) {
-                            lyft_price = ride.estimated_cost_cents_max;
-                            best_lyft_option_1 = {
-                                display_name: ride.display_name,
-                                price: ((ride.estimated_cost_cents_max + ride.estimated_cost_cents_min) / 120),
-                                estimated_distance_miles: ride.estimated_distance_miles,
-                                estimated_duration_seconds: ride.estimated_duration_seconds,
-                                primetime_percentage: ride.primetime_percentage,
-                                ride_type: ride.ride_type,
-                                driver_time: 0
-                            };
-                        }
-                        // If the ride is cheaper than the previous
-                        if (ride.estimated_cost_cents_max < lyft_price) {
-                            lyft_price = ride.estimated_cost_cents_max;
-                            best_lyft_option_1 = {
-                                display_name: ride.display_name,
-                                price: ((ride.estimated_cost_cents_max + ride.estimated_cost_cents_min) / 120),
-                                estimated_distance_miles: ride.estimated_distance_miles,
-                                estimated_duration_seconds: ride.estimated_duration_seconds,
-                                primetime_percentage: ride.primetime_percentage,
-                                ride_type: ride.ride_type,
-                                driver_time: 0
-                            };
-                        }
-                    }
-                    // Send the new request for Driver Times
-                    var lyftHeaders_1 = {
-                        'Authorization': 'bearer ' + lyftClientId
-                    };
-                    var lyftOptions_1 = {
-                        url: 'https://api.lyft.com/v1/eta?lat=' + start_lat + '&lng=' + start_long + '&ride_type=' + best_lyft_option_1.ride_type,
-                        headers: lyftHeaders_1
-                    };
-                    // Send the request for Driver times
-                    request(lyftOptions_1, function (error, response, info) {
-                        if (error) {
-                            console.log(error);
-                        }
-                        else {
-                            // Parse the JSON
-                            var body_3 = JSON.parse(info);
-                            // Set the Driver time
-                            best_lyft_option_1.driver_time = body_3.eta_estimates[0].eta_seconds;
-                            // Save the info to user data
-                            session.userData.Lyft = best_lyft_option_1;
-                        }
-                        lyftFlag = true;
-                        console.log("Finished Lyft Time");
-                    });
-                }
-                console.log("Finished Lyft Price");
-            });
-            console.log("Finished All of Lyft");
+                    console.log("Finished Lyft Price");
+                });
+                console.log("Finished All of Lyft");
+            }
         });
         //=========================================================
         // Car2Go information 
@@ -688,13 +770,37 @@ bot.dialog('/', [
             totalTime: "Error",
             proudctId: "Error"
         };
-        console.log(uber);
-        console.log();
-        console.log(lyft);
-        console.log();
-        console.log(transitInfo);
-        // If the preference is for value
-        if (preference == 0) {
+        // If there is an error at all
+        if (uber.uber_name == "Error" || lyft.display_name == "Error") {
+            // If uber and not lyft
+            if (uber.uber_name == "Error" && lyft.display_name != "Error") {
+                rideshare =
+                    {
+                        driverTime: (lyft.driver_time / 60).toPrecision(2),
+                        price: lyft.price.toPrecision(2),
+                        serviceProvider: "Lyft",
+                        serviceType: lyft.display_name,
+                        totalDistance: lyft.estimated_distance_miles.toPrecision(2),
+                        totalTime: (lyft.estimated_duration_seconds / 60).toPrecision(2),
+                        proudctId: lyft.ride_type
+                    };
+            }
+            else if (uber.uber_name != "Error" && lyft.display_name == "Error") {
+                rideshare =
+                    {
+                        driverTime: (uber.uber_driver_time / 60).toPrecision(2),
+                        price: uber.uber_price.toPrecision(2),
+                        serviceProvider: "Uber",
+                        serviceType: uber.uber_name,
+                        totalDistance: uber.uber_distance.toPrecision(2),
+                        totalTime: (uber.uber_travel_time / 60).toPrecision(2),
+                        proudctId: uber.uber_productId
+                    };
+            }
+            else {
+            }
+        }
+        else if (preference == 0) {
             var uberPrice = uber.uber_price;
             var lyftPrice = lyft.price;
             // Find the lower price
@@ -723,8 +829,7 @@ bot.dialog('/', [
                     };
             }
         }
-        // If preference is for time
-        if (preference == 1) {
+        else if (preference == 1) {
             var uberDriverTime = uber.uber_driver_time;
             var lyftDriverTime = lyft.driver_time;
             if (uberDriverTime < lyftDriverTime) {
@@ -752,8 +857,7 @@ bot.dialog('/', [
                     };
             }
         }
-        // Preference is for luxury
-        if (preference == 2) {
+        else if (preference == 2) {
             rideshare =
                 {
                     driverTime: (uber.uber_driver_time / 60).toPrecision(2),
@@ -767,7 +871,14 @@ bot.dialog('/', [
         }
         // Build out the strings
         var transitString = "Transit <br/>\n        - Departure Time: " + transitInfo.transitDepartureTime + " <br/>\n        - Arrival Time: " + transitInfo.transitArrivalTime + " <br/>\n        - Distance: " + transitInfo.transitDistance + " miles <br/>\n        - Duration " + transitInfo.transitDuration + " minutes <br/>";
-        var rideshareString = "Rideshare <br/>\n        - Service: " + rideshare.serviceProvider + " <br/>\n        - Ride Type: " + rideshare.serviceType + " <br/>\n        - Price: " + rideshare.price + " <br/>\n        - Driver Distance: " + rideshare.driverTime + " minutes away <br/>\n        - Total Distance: " + rideshare.totalDistance + " miles <br/>\n        - Total Duration: " + rideshare.totalTime + " minutes <br/>";
+        // Check to see if there is an error with the ridesharing 
+        var rideshareString;
+        if (rideshare.serviceType == "Error") {
+            rideshareString = "We could not find any rideharing options";
+        }
+        else {
+            rideshareString = "Rideshare <br/>\n        - Service: " + rideshare.serviceProvider + " <br/>\n        - Ride Type: " + rideshare.serviceType + " <br/>\n            - Price: " + rideshare.price + " <br/>\n            - Driver Distance: " + rideshare.driverTime + " minutes away <br/>\n            - Total Distance: " + rideshare.totalDistance + " miles <br/>\n            - Total Duration: " + rideshare.totalTime + " minutes <br/>";
+        }
         session.send(transitString + rideshareString);
         // Add the options to the userdata
         session.userData.Rideshare = rideshare;
@@ -801,7 +912,7 @@ bot.dialog("/options", [
                             directions += "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction + " <br/>";
                         }
                         else {
-                            directions += "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction + " <br/> \n        ";
+                            directions += "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction + " <br/> \n                            ";
                         }
                     }
                 }
@@ -827,10 +938,14 @@ bot.dialog("/options", [
                 session.send(uberString);
             }
             else if (rideshare.serviceProvider == 'Lyft') {
-                var clientId = 'gAAAAABZIPjkPxmPgs83bWslOmxyt26-4AFcNDYZOwXWj4gyu7NEjddtxNK0DeNOqRrIsOCjKF-16_NiqApbMT-5vtGXJaulRmRk6b6QqDpYyU0MGYojno-FKnn58KzWRPwfoqFF8MUA5LTP0FpoNScafNXOeSgdic1eWsoGQm6Kg5c7TyQviRQ=';
+                var clientId = '9LHHn1wknlgs';
                 // Order the Lyft
                 session.send("Or click the link to open the app and order your ride!");
-                var lyftString = "https://lyft.com/ride?id=" + rideshare.proudctId + "&pickup[latitude]=" + startLat + "&partner=" + clientId + "&destination[latitude]=" + endLat + "&destination[longitude]=" + endLong;
+                var lyftString = "https://lyft.com/ride?id=" + rideshare.proudctId + "&pickup[latitude]=" + startLat + "&pickup[longitude]=" + startLong + "&partner=" + clientId + "&destination[latitude]=" + endLat + "&destination[longitude]=" + endLong;
+                session.send(lyftString);
+            }
+            else {
+                session.send("We could not find any ridesharing options here");
             }
             // repeat the dialog
             session.replaceDialog('/options');
@@ -840,5 +955,4 @@ bot.dialog("/options", [
         }
     }
 ]);
-
 

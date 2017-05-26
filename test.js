@@ -1,31 +1,26 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const builder = require("botbuilder");
+const botbuilder_azure = require("botbuilder-azure");
 const restify = require("restify");
 const request = require("request");
 const googleMaps = require("@google/maps");
 const process = require('process');
+const path = require('path');
 
 var googleMapsClient = googleMaps.createClient({
     key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' //process.env.GOOGLE_MAPS_KEY
 });
-// Setup Restify Server
-var server = restify.createServer();
-server.listen(process.env.port || process.env.PORT || 3978, function () {
-    console.log('%s listening to %s', server.name, server.url);
-});
-// Create chat bot 
-var connector = new builder.ChatConnector({
-    appId: "",
-    appPassword: "" //'4VGq7jLMxiDxDBwoYefSrfg' //process.env.MICROSOFT_APP_PASSWORD
+var useEmulator = (process.env.NODE_ENV == 'development');
+useEmulator = true;
+var connector = useEmulator ? new builder.ChatConnector() : new botbuilder_azure.BotServiceConnector({
+    appId: process.env['MicrosoftAppId'],
+    appPassword: process.env['MicrosoftAppPassword'],
+    stateEndpoint: process.env['BotStateEndpoint'],
+    openIdMetadata: process.env['BotOpenIdMetadata']
 });
 var bot = new builder.UniversalBot(connector);
-server.post('/api/messages', connector.listen());
-// Serve a static web page
-server.get(/.*/, restify.serveStatic({
-    'directory': '.',
-    'default': 'Index.html'
-}));
+bot.localePath(path.join(__dirname, './locale'));
 function HtmlParse(html) {
     html += " ";
     var html_array = html.split("");
@@ -954,6 +949,17 @@ bot.dialog("/options", [
         }
     }
 ]);
+if (useEmulator) {
+    var server_1 = restify.createServer();
+    server_1.listen(process.env.port || process.env.PORT || 3978, function () {
+        console.log('%s listening to %s', server_1.name, server_1.url);
+    });
+    server_1.post('/api/messages', connector.listen());
+}
+else {
+    module.exports = { default: connector.listen() };
+}
+
 
 
 

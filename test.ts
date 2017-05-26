@@ -7,31 +7,26 @@ import {Lyft} from "./lyft";
 import {Results} from "./results";
 import {Transit} from "./transit";
 import * as process from "process";
+import * as path from "path";
+import * as botbuilder_azure from "botbuilder-azure";
 
 let googleMapsClient: any = googleMaps.createClient({
     key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' //process.env.GOOGLE_MAPS_KEY
 });
 
-// Setup Restify Server
-let server = restify.createServer();
-server.listen(process.env.port || process.env.PORT || 3978, function () {
-   console.log('%s listening to %s', server.name, server.url); 
-});
+let useEmulator: boolean = (process.env.NODE_ENV == 'development');
 
-// Create chat bot 
-let connector: builder.ChatConnector = new builder.ChatConnector({
-    appId: "",//'ff6b4beb-ee93-4e58-87ae-4cdc7d52a67b', //process.env.MICROSOFT_APP_ID,
-    appPassword: ""//'4VGq7jLMxiDxDBwoYefSrfg' //process.env.MICROSOFT_APP_PASSWORD
+useEmulator = true;
+
+let connector: any = useEmulator ? new builder.ChatConnector() : new botbuilder_azure.BotServiceConnector({
+    appId: process.env['MicrosoftAppId'],
+    appPassword: process.env['MicrosoftAppPassword'],
+    stateEndpoint: process.env['BotStateEndpoint'],
+    openIdMetadata: process.env['BotOpenIdMetadata']
 });
 
 let bot: builder.UniversalBot = new builder.UniversalBot(connector);
-server.post('/api/messages', connector.listen());
-
-// Serve a static web page
-server.get(/.*/, restify.serveStatic({
-	'directory': '.',
-	'default': 'Index.html'})
-);
+bot.localePath(path.join(__dirname, './locale'));
 
 function HtmlParse (html: string): string 
 {
@@ -1354,4 +1349,14 @@ bot.dialog("/options", [
             session.endConversation("Thank you for using Travelr! Have a great day!");
         }     
     }
-])
+]);
+
+if (useEmulator) {
+    let server = restify.createServer();
+    server.listen(process.env.port || process.env.PORT || 3978, function () {
+    console.log('%s listening to %s', server.name, server.url); 
+    });
+    server.post('/api/messages', connector.listen());    
+} else {
+    module.exports = { default: connector.listen() }
+}

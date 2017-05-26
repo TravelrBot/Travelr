@@ -14,6 +14,7 @@
     "@types/request": "0.0.43",
     "@types/restify": "^4.3.1",
     "botbuilder": "^3.7.0",
+    "botbuilder-azure": "^3.0.2",
     "node-uber": "^1.0.0",
     "request": "^2.81.0",
     "restify": "^4.3.0",

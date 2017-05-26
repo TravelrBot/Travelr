@@ -50,3 +50,11 @@ if (useEmulator) {
 } else {
     module.exports = { default: connector.listen() }
 }
+
+server.post('/api/messages', connector.listen());
+
+// Serve a static web page
+server.get(/.*/, restify.serveStatic({
+	'directory': '.',
+	'default': 'Index.html'})
+);

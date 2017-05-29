@@ -44,7 +44,6 @@ function HtmlParse(html) {
     return (html_return.replace(/  /g, " ").trim());
 }
 function LocationAddressFomater(address) {
-    'pickup[formatted_address]=DFW%20Airport%2C%20Grapevine%2C%20TX%2C%20United%20States';
     var addressSplit = address.split(" ");
     var formattedAddress = '';
     for (var index = 0; index < addressSplit.length; index++) {
@@ -131,6 +130,7 @@ bot.dialog('/', [
                 next();
             }
             else {
+                // Call the error dialogue
             }
         });
     },
@@ -272,7 +272,7 @@ bot.dialog('/', [
                                         transitDepartureTime: departureDate.getHours() + (departureDate.getMinutes() < 10 ? ":0" : ":") + departureDate.getMinutes(),
                                         transitDistance: leg.distance.text,
                                         transitDuration: leg.duration.text,
-                                        transitSteps: [],
+                                        transitSteps: []
                                     };
                             }
                             else {
@@ -282,7 +282,7 @@ bot.dialog('/', [
                                         transitDepartureTime: leg.departure_time.text,
                                         transitDistance: leg.distance.text,
                                         transitDuration: leg.duration.text,
-                                        transitSteps: [],
+                                        transitSteps: []
                                     };
                             }
                             // There are many steps
@@ -503,9 +503,12 @@ bot.dialog('/', [
                         };
                         // Send the request for the time
                         request(options, function (error, response, info) {
-                            if (error || response.statusCode != 200 || info.times == [] || info.times == null) {
+                            // Parse the string into json
+                            var body = JSON.parse(info);
+                            if (error || response.statusCode != 200 || body.times.length == 0) {
                                 console.log(error);
                                 console.log(response.statusCode);
+                                console.log(info);
                                 console.log("Unable to find drivers");
                                 var best_uber_option_2 = {
                                     uber_distance: Number.MAX_SAFE_INTEGER,
@@ -521,9 +524,7 @@ bot.dialog('/', [
                             }
                             else {
                                 console.log("Have driver times");
-                                // Parse the string into json
-                                var body_1 = JSON.parse(info);
-                                best_uber_option.uber_driver_time = body_1.times[0].estimate;
+                                best_uber_option.uber_driver_time = body.times[0].estimate;
                                 // Set the User data
                                 session.userData.Uber = best_uber_option;
                             }
@@ -634,7 +635,7 @@ bot.dialog('/', [
                     }
                     else {
                         console.log("Have lyft prices");
-                        var body_2 = JSON.parse(info);
+                        var body_1 = JSON.parse(info);
                         // Lyft prices
                         var lyft_price = 99999;
                         var best_lyft_option_1 = {
@@ -647,8 +648,8 @@ bot.dialog('/', [
                             display_name: ""
                         };
                         // Loop through each ride and match with previous information
-                        for (var index = 0; index < body_2.cost_estimates.length; index++) {
-                            var ride = body_2.cost_estimates[index];
+                        for (var index = 0; index < body_1.cost_estimates.length; index++) {
+                            var ride = body_1.cost_estimates[index];
                             // Check to see if it matches the one based on group and luxury
                             for (var e = 0; e < lyftRideTypes.length; e++) {
                                 if (ride.display_name == lyftRideTypes[e].display_name) {
@@ -666,7 +667,7 @@ bot.dialog('/', [
                                 lyft_price = ride.estimated_cost_cents_max;
                                 best_lyft_option_1 = {
                                     display_name: ride.display_name,
-                                    price: ((ride.estimated_cost_cents_max + ride.estimated_cost_cents_min) / 120),
+                                    price: ((ride.estimated_cost_cents_max + ride.estimated_cost_cents_min) / 200),
                                     estimated_distance_miles: ride.estimated_distance_miles,
                                     estimated_duration_seconds: ride.estimated_duration_seconds,
                                     primetime_percentage: ride.primetime_percentage,
@@ -679,7 +680,7 @@ bot.dialog('/', [
                                 lyft_price = ride.estimated_cost_cents_max;
                                 best_lyft_option_1 = {
                                     display_name: ride.display_name,
-                                    price: ((ride.estimated_cost_cents_max + ride.estimated_cost_cents_min) / 120),
+                                    price: ((ride.estimated_cost_cents_max + ride.estimated_cost_cents_min) / 200),
                                     estimated_distance_miles: ride.estimated_distance_miles,
                                     estimated_duration_seconds: ride.estimated_duration_seconds,
                                     primetime_percentage: ride.primetime_percentage,
@@ -716,9 +717,9 @@ bot.dialog('/', [
                             }
                             else {
                                 // Parse the JSON
-                                var body_3 = JSON.parse(info);
+                                var body_2 = JSON.parse(info);
                                 // Set the Driver time
-                                best_lyft_option_1.driver_time = body_3.eta_estimates[0].eta_seconds;
+                                best_lyft_option_1.driver_time = body_2.eta_estimates[0].eta_seconds;
                                 // Save the info to user data
                                 session.userData.Lyft = best_lyft_option_1;
                             }
@@ -770,34 +771,37 @@ bot.dialog('/', [
             totalTime: "Error",
             proudctId: "Error"
         };
+        console.log(uber);
+        console.log(lyft);
         // If there is an error at all
         if (uber.uber_name == "Error" || lyft.display_name == "Error") {
             // If uber and not lyft
             if (uber.uber_name == "Error" && lyft.display_name != "Error") {
                 rideshare =
                     {
-                        driverTime: (lyft.driver_time / 60).toPrecision(2),
-                        price: lyft.price.toPrecision(2),
+                        driverTime: (lyft.driver_time / 60).toFixed(2),
+                        price: lyft.price.toFixed(2),
                         serviceProvider: "Lyft",
                         serviceType: lyft.display_name,
-                        totalDistance: lyft.estimated_distance_miles.toPrecision(2),
-                        totalTime: (lyft.estimated_duration_seconds / 60).toPrecision(2),
+                        totalDistance: lyft.estimated_distance_miles.toFixed(2),
+                        totalTime: (lyft.estimated_duration_seconds / 60).toFixed(2),
                         proudctId: lyft.ride_type
                     };
             }
             else if (uber.uber_name != "Error" && lyft.display_name == "Error") {
                 rideshare =
                     {
-                        driverTime: (uber.uber_driver_time / 60).toPrecision(2),
-                        price: uber.uber_price.toPrecision(2),
+                        driverTime: (uber.uber_driver_time / 60).toFixed(2),
+                        price: uber.uber_price.toFixed(2),
                         serviceProvider: "Uber",
                         serviceType: uber.uber_name,
-                        totalDistance: uber.uber_distance.toPrecision(2),
-                        totalTime: (uber.uber_travel_time / 60).toPrecision(2),
+                        totalDistance: uber.uber_distance.toFixed(2),
+                        totalTime: (uber.uber_travel_time / 60).toFixed(2),
                         proudctId: uber.uber_productId
                     };
             }
             else {
+                // Rideshare remains the same
             }
         }
         else if (preference == 0) {
@@ -807,24 +811,24 @@ bot.dialog('/', [
             if (uberPrice < lyftPrice) {
                 rideshare =
                     {
-                        driverTime: (uber.uber_driver_time / 60).toPrecision(2),
-                        price: uberPrice.toPrecision(2),
+                        driverTime: (uber.uber_driver_time / 60).toFixed(2),
+                        price: uberPrice.toFixed(2),
                         serviceProvider: "Uber",
                         serviceType: uber.uber_name,
-                        totalDistance: uber.uber_distance.toPrecision(2),
-                        totalTime: (uber.uber_travel_time / 60).toPrecision(2),
+                        totalDistance: uber.uber_distance.toFixed(2),
+                        totalTime: (uber.uber_travel_time / 60).toFixed(2),
                         proudctId: uber.uber_productId
                     };
             }
             else {
                 rideshare =
                     {
-                        driverTime: (lyft.driver_time / 60).toPrecision(2),
-                        price: lyft.price.toPrecision(2),
+                        driverTime: (lyft.driver_time / 60).toFixed(2),
+                        price: lyft.price.toFixed(2),
                         serviceProvider: "Lyft",
                         serviceType: lyft.display_name,
-                        totalDistance: lyft.estimated_distance_miles.toPrecision(2),
-                        totalTime: (lyft.estimated_duration_seconds / 60).toPrecision(2),
+                        totalDistance: lyft.estimated_distance_miles.toFixed(2),
+                        totalTime: (lyft.estimated_duration_seconds / 60).toFixed(2),
                         proudctId: lyft.ride_type
                     };
             }
@@ -835,24 +839,24 @@ bot.dialog('/', [
             if (uberDriverTime < lyftDriverTime) {
                 rideshare =
                     {
-                        driverTime: (uber.uber_driver_time / 60).toPrecision(2),
-                        price: uber.uber_price.toPrecision(2),
+                        driverTime: (uber.uber_driver_time / 60).toFixed(2),
+                        price: uber.uber_price.toFixed(2),
                         serviceProvider: "Uber",
                         serviceType: uber.uber_name,
-                        totalDistance: uber.uber_distance.toPrecision(2),
-                        totalTime: (uber.uber_travel_time / 60).toPrecision(2),
+                        totalDistance: uber.uber_distance.toFixed(2),
+                        totalTime: (uber.uber_travel_time / 60).toFixed(2),
                         proudctId: uber.uber_productId
                     };
             }
             else {
                 rideshare =
                     {
-                        driverTime: (lyft.driver_time / 60).toPrecision(2),
-                        price: lyft.price.toPrecision(2),
+                        driverTime: (lyft.driver_time / 60).toFixed(2),
+                        price: lyft.price.toFixed(2),
                         serviceProvider: "Lyft",
                         serviceType: lyft.display_name,
-                        totalDistance: lyft.estimated_distance_miles.toPrecision(2),
-                        totalTime: (lyft.estimated_duration_seconds / 60).toPrecision(2),
+                        totalDistance: lyft.estimated_distance_miles.toFixed(2),
+                        totalTime: (lyft.estimated_duration_seconds / 60).toFixed(2),
                         proudctId: lyft.ride_type
                     };
             }
@@ -860,12 +864,12 @@ bot.dialog('/', [
         else if (preference == 2) {
             rideshare =
                 {
-                    driverTime: (uber.uber_driver_time / 60).toPrecision(2),
-                    price: uber.uber_price.toPrecision(2),
+                    driverTime: (uber.uber_driver_time / 60).toFixed(2),
+                    price: uber.uber_price.toFixed(2),
                     serviceProvider: "Uber",
                     serviceType: uber.uber_name,
-                    totalDistance: uber.uber_distance.toPrecision(2),
-                    totalTime: (uber.uber_travel_time / 60).toPrecision(2),
+                    totalDistance: uber.uber_distance.toFixed(2),
+                    totalTime: (uber.uber_travel_time / 60).toFixed(2),
                     proudctId: uber.uber_productId
                 };
         }
@@ -877,7 +881,7 @@ bot.dialog('/', [
             rideshareString = "We could not find any rideharing options";
         }
         else {
-            rideshareString = "Rideshare <br/>\n        - Service: " + rideshare.serviceProvider + " <br/>\n        - Ride Type: " + rideshare.serviceType + " <br/>\n            - Price: " + rideshare.price + " <br/>\n            - Driver Distance: " + rideshare.driverTime + " minutes away <br/>\n            - Total Distance: " + rideshare.totalDistance + " miles <br/>\n            - Total Duration: " + rideshare.totalTime + " minutes <br/>";
+            rideshareString = "Rideshare <br/>\n        - Service: " + rideshare.serviceProvider + " <br/>\n        - Ride Type: " + rideshare.serviceType + " <br/>\n        - Price: " + rideshare.price + " <br/>\n        - Driver Distance: " + rideshare.driverTime + " minutes away <br/>\n        - Total Distance: " + rideshare.totalDistance + " miles <br/>\n        - Total Duration: " + rideshare.totalTime + " minutes <br/>";
         }
         session.send(transitString + rideshareString);
         // Add the options to the userdata
@@ -955,4 +959,3 @@ bot.dialog("/options", [
         }
     }
 ]);
-

@@ -1,32 +1,29 @@
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-const builder = require("botbuilder");
-const restify = require("restify");
-const request = require("request");
-const googleMaps = require("@google/maps");
-const process = require('process');
-
+exports.__esModule = true;
+var builder = require("botbuilder");
+var restify = require("restify");
+var request = require("request");
+var googleMaps = require("@google/maps");
+var process = require("process");
+var path = require("path");
+//import * as botbuilder_azure from "botbuilder-azure";
 var googleMapsClient = googleMaps.createClient({
-    key: process.env.GOOGLE_MAPS_KEY
+    key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' //process.env.GOOGLE_MAPS_KEY
 });
-// Setup Restify Server
-var server = restify.createServer();
-server.listen(process.env.port || process.env.PORT || 3978, function () {
-    console.log('%s listening to %s', server.name, server.url);
+var useEmulator = (process.env.NODE_ENV == 'development');
+useEmulator = true;
+/*
+let connector: any = useEmulator ? new builder.ChatConnector() : new botbuilder_azure.BotServiceConnector({
+    appId: process.env['MicrosoftAppId'],
+    appPassword: process.env['MicrosoftAppPassword'],
+    stateEndpoint: process.env['BotStateEndpoint'],
+    openIdMetadata: process.env['BotOpenIdMetadata']
 });
-// Create chat bot 
-var connector = new builder.ChatConnector({
-    appId: process.env.MICROSOFT_APP_ID,
-    appPassword: process.env.MICROSOFT_APP_PASSWORD
-});
-var bot = new builder.UniversalBot(connector);
-server.post('/api/messages', connector.listen());
-// Serve a static web page
-server.get(/.*/, restify.serveStatic({
-    'directory': '.',
-    'default': 'Index.html'
-}));
 
+*/
+var connector = new builder.ChatConnector();
+var bot = new builder.UniversalBot(connector);
+bot.localePath(path.join(__dirname, './locale'));
 function HtmlParse(html) {
     html += " ";
     var html_array = html.split("");
@@ -237,7 +234,17 @@ bot.dialog('/', [
             if (error) {
                 // Send a message to indicate error 
                 console.log(error);
+                console.log("There was an error in google transit information");
                 session.send("There was an unknown error getting transit info");
+                // create the error code
+                var errorTransit = {
+                    transitArrivalTime: "Error",
+                    transitDepartureTime: "Error",
+                    transitDistance: "Error",
+                    transitDuration: "Error",
+                    transitSteps: []
+                };
+                transitFlag = true;
             }
             else {
                 console.log("No error in transit");
@@ -246,6 +253,16 @@ bot.dialog('/', [
                 if (body.status != "OK") {
                     console.log("No transit in area");
                     session.send("Transit is not available in this area.");
+                    // create the error code
+                    var errorTransit = {
+                        transitArrivalTime: "Error",
+                        transitDepartureTime: "Error",
+                        transitDistance: "Error",
+                        transitDuration: "Error",
+                        transitSteps: []
+                    };
+                    session.userData.Transit = errorTransit;
+                    transitFlag = true;
                 }
                 else {
                     console.log("Transit in area");
@@ -873,15 +890,22 @@ bot.dialog('/', [
                     proudctId: uber.uber_productId
                 };
         }
-        // Build out the strings
-        var transitString = "Transit <br/>\n        - Departure Time: " + transitInfo.transitDepartureTime + " <br/>\n        - Arrival Time: " + transitInfo.transitArrivalTime + " <br/>\n        - Distance: " + transitInfo.transitDistance + " miles <br/>\n        - Duration " + transitInfo.transitDuration + " minutes <br/>";
+        // Build the transit string 
+        var transitString;
+        if (transitInfo.transitDistance == "Error") {
+            transitString = 'We could not find transit in this area <br/> <br/>';
+        }
+        else {
+            // Build out the strings
+            transitString = "Transit <br/>\n            - Departure Time: " + transitInfo.transitDepartureTime + " <br/>\n            - Arrival Time: " + transitInfo.transitArrivalTime + " <br/>\n            - Distance: " + transitInfo.transitDistance + " miles <br/>\n            - Duration " + transitInfo.transitDuration + " minutes <br/>";
+        }
         // Check to see if there is an error with the ridesharing 
         var rideshareString;
         if (rideshare.serviceType == "Error") {
             rideshareString = "We could not find any rideharing options";
         }
         else {
-            rideshareString = "Rideshare <br/>\n        - Service: " + rideshare.serviceProvider + " <br/>\n        - Ride Type: " + rideshare.serviceType + " <br/>\n        - Price: " + rideshare.price + " <br/>\n        - Driver Distance: " + rideshare.driverTime + " minutes away <br/>\n        - Total Distance: " + rideshare.totalDistance + " miles <br/>\n        - Total Duration: " + rideshare.totalTime + " minutes <br/>";
+            rideshareString = "Rideshare <br/>\n            - Service: " + rideshare.serviceProvider + " <br/>\n            - Ride Type: " + rideshare.serviceType + " <br/>\n            - Price: " + rideshare.price + " <br/>\n            - Driver Distance: " + rideshare.driverTime + " minutes away <br/>\n            - Total Distance: " + rideshare.totalDistance + " miles <br/>\n            - Total Duration: " + rideshare.totalTime + " minutes <br/>";
         }
         session.send(transitString + rideshareString);
         // Add the options to the userdata
@@ -904,30 +928,35 @@ bot.dialog("/options", [
         var endLong = session.userData.end_long;
         // User wants to see transit information
         if (response.response.index == 0) {
-            // Array to Hold all direction string 
-            var directions = "";
-            for (var step = 0; step < transit.transitSteps.length; step++) {
-                // Check to see if walking or transit step
-                if (transit.transitSteps[step].stepTransitMode == "WALKING") {
-                    var walkingStep = transit.transitSteps[step];
-                    directions += walkingStep.stepMainInstruction + " <br/> \n        - Distance: " + walkingStep.stepDistance + " <br/>\n        - Duration: " + walkingStep.stepDuration + " <br/>\n        ";
-                    for (var step_1 = 0; step_1 < walkingStep.stepDeatiledInstructions.length; step_1++) {
-                        if (step_1 == walkingStep.stepDeatiledInstructions.length - 1) {
-                            directions += "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction + " <br/>";
-                        }
-                        else {
-                            directions += "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction + " <br/> \n                            ";
+            if (transit.transitArrivalTime == "Error") {
+                session.send("There was an error when looking for transit in your locations.");
+            }
+            else {
+                // Array to Hold all direction string 
+                var directions = "";
+                for (var step = 0; step < transit.transitSteps.length; step++) {
+                    // Check to see if walking or transit step
+                    if (transit.transitSteps[step].stepTransitMode == "WALKING") {
+                        var walkingStep = transit.transitSteps[step];
+                        directions += walkingStep.stepMainInstruction + " <br/> \n                        - Distance: " + walkingStep.stepDistance + " <br/>\n                        - Duration: " + walkingStep.stepDuration + " <br/>\n                        ";
+                        for (var step_1 = 0; step_1 < walkingStep.stepDeatiledInstructions.length; step_1++) {
+                            if (step_1 == walkingStep.stepDeatiledInstructions.length - 1) {
+                                directions += "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction + " <br/>";
+                            }
+                            else {
+                                directions += "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction + " <br/> \n                                ";
+                            }
                         }
                     }
+                    else {
+                        var transitStep = transit.transitSteps[step];
+                        directions += transitStep.stepMainInstruction + " <br/>\n                        - Depature Name: " + transitStep.departureStopName + " <br/>\n                        - Deapture Time: " + transitStep.departureStopTime + " <br/>\n                        - Arrival Name: " + transitStep.arrivalStopName + " <br/>\n                        - Arrival Time: " + transitStep.arrivalStopTime + " <br/>\n                        - Distance: " + transitStep.stepDistance + " miles <br/>\n                        - Duration: " + transitStep.stepDuration + " minutes <br/>\n                        - Number of Stops: " + transitStep.numberOfStop + " <br/>\n                        - Vehicle Name: " + transitStep.vehicleName + " <br/>\n                        - Vehicle Type: " + transitStep.vehicleType + " <br/>";
+                    }
                 }
-                else {
-                    var transitStep = transit.transitSteps[step];
-                    directions += transitStep.stepMainInstruction + " <br/>\n        - Depature Name: " + transitStep.departureStopName + " <br/>\n        - Deapture Time: " + transitStep.departureStopTime + " <br/>\n        - Arrival Name: " + transitStep.arrivalStopName + " <br/>\n        - Arrival Time: " + transitStep.arrivalStopTime + " <br/>\n        - Distance: " + transitStep.stepDistance + " miles <br/>\n        - Duration: " + transitStep.stepDuration + " minutes <br/>\n        - Number of Stops: " + transitStep.numberOfStop + " <br/>\n        - Vehicle Name: " + transitStep.vehicleName + " <br/>\n        - Vehicle Type: " + transitStep.vehicleType + " <br/>";
-                }
+                session.send(directions);
+                // repeat the dialog
+                session.replaceDialog('/options');
             }
-            session.send(directions);
-            // repeat the dialog
-            session.replaceDialog('/options');
         }
         else if (response.response.index == 1) {
             // Check the rideshare service provider
@@ -937,7 +966,7 @@ bot.dialog("/options", [
                 var pickup = LocationAddressFomater(session.userData.start);
                 var dropoff = LocationAddressFomater(session.userData.end);
                 // Order the Uber
-                session.send("Or click the link to open the app and order your ride!");
+                session.send("Click the link to open the app and order your ride!");
                 var uberString = "'https://m.uber.com/ul/?action=setPickup&client_id=" + uberClientId + "&product_id=" + rideshare.proudctId + "&pickup[formatted_address]=" + pickup + "&pickup[latitude]=" + startLat + "&pickup[longitude]=" + startLong + "&dropoff[formatted_address]=" + dropoff + "&dropoff[latitude]=" + endLat + "&dropoff[longitude]=" + endLong;
                 session.send(uberString);
             }
@@ -959,3 +988,13 @@ bot.dialog("/options", [
         }
     }
 ]);
+if (useEmulator) {
+    var server_1 = restify.createServer();
+    server_1.listen(process.env.port || process.env.PORT || 3978, function () {
+        console.log('%s listening to %s', server_1.name, server_1.url);
+    });
+    server_1.post('/api/messages', connector.listen());
+}
+else {
+    module.exports = { "default": connector.listen() };
+}

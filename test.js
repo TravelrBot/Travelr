@@ -232,7 +232,7 @@ bot.dialog('/', [
         // Send the request for transif information
         request(transitOptions, function (error, response, info) {
             // Check if Error
-            if (error) {
+            if (error || response.statusCode != 200) {
                 // Send a message to indicate error 
                 console.log(error);
                 session.send("There was an unknown error getting transit info");
@@ -243,6 +243,7 @@ bot.dialog('/', [
                 var body = JSON.parse(info);
                 if (body.status != "OK") {
                     console.log("No transit in area");
+                    session.userData.Transit = -1;
                     session.send("Transit is not available in this area.");
                 }
                 else {

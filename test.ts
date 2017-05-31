@@ -9,5 +9,6 @@ let result_type_2: string = 'administrative_area_level_2';
 let result_type_3: string = 'administrative_area_level_3';
 
 
-let car2go_location_url: string = 'http://www.car2go.com/api/v2.1/locations';
+let car2go_location_url: string = 'http://www.car2go.com/api/v2.1/locations?format=json';
+
 

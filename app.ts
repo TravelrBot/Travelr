@@ -18,6 +18,7 @@ let useEmulator: boolean = (process.env.NODE_ENV == 'development');
 
 useEmulator = true;
 
+
 /*
 let connector: any = useEmulator ? new builder.ChatConnector() : new botbuilder_azure.BotServiceConnector({
     appId: process.env['MicrosoftAppId'],
@@ -28,7 +29,10 @@ let connector: any = useEmulator ? new builder.ChatConnector() : new botbuilder_
 
 */
 
-let connector: builder.ChatConnector = new builder.ChatConnector();
+let connector: builder.ChatConnector = new builder.ChatConnector({
+    appId: process.env.MICROSOFT_APP_ID,
+    appPassword: process.env.MICROSOFT_APP_PASSWORD
+});
 
 let bot: builder.UniversalBot = new builder.UniversalBot(connector);
 bot.localePath(path.join(__dirname, './locale'));
@@ -86,11 +90,11 @@ function LocationAddressFomater (address: string): string
 //=========================================================
 // Bots Dialogs
 //=========================================================
-
 bot.dialog('/', [
 
     // send the intro
-    function (session: builder.Session, args: any, next: any): void{
+    function (session: builder.Session, args: any, next: any): void
+    {
         session.send("Hello and welcome to Travelr! We just need a few details to get you to your destination!");
         next();
     },
@@ -360,6 +364,7 @@ bot.dialog('/', [
                     };
 
                     transitFlag = true;
+                    session.userData.Transit = errorTransit;
                 }
                 else
                 {   
@@ -833,7 +838,6 @@ bot.dialog('/', [
                 console.log("In lyft Ride Types");
 
                 let body: Lyft.IAllRideTypes = JSON.parse(info);
-
 
                 for (let index: number = 0; index < body.ride_types.length; index++)
                 {

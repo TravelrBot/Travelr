@@ -8,7 +8,7 @@ var process = require("process");
 var path = require("path");
 //import * as botbuilder_azure from "botbuilder-azure";
 var googleMapsClient = googleMaps.createClient({
-    key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' //process.env.GOOGLE_MAPS_KEY
+    key: process.env.GOOGLE_MAPS_KEY
 });
 var useEmulator = (process.env.NODE_ENV == 'development');
 useEmulator = true;
@@ -21,7 +21,10 @@ let connector: any = useEmulator ? new builder.ChatConnector() : new botbuilder_
 });
 
 */
-var connector = new builder.ChatConnector();
+var connector = new builder.ChatConnector({
+    appId: process.env.MICROSOFT_APP_ID,
+    appPassword: process.env.MICROSOFT_APP_PASSWORD
+});
 var bot = new builder.UniversalBot(connector);
 bot.localePath(path.join(__dirname, './locale'));
 function HtmlParse(html) {
@@ -245,6 +248,7 @@ bot.dialog('/', [
                     transitSteps: []
                 };
                 transitFlag = true;
+                session.userData.Transit = errorTransit;
             }
             else {
                 console.log("No error in transit");
@@ -357,9 +361,9 @@ bot.dialog('/', [
         //=========================================================
         console.log("In uber");
         // Set all of the constants
-        var client_id = '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP'; //process.env.UBER_APP_ID,
-        var client_secret = 'vAy-juG54SV15yiv7hsDgVMegvMDPbjbtuayZ48a'; //process.env.UBER_APP_PASSWORD,
-        var server_token = 'CSQlbbbn6k0gbYZULEqiLk0cwUy03ZIPkIYxPrOs'; //process.env.UBER_APP_TOKEN,
+        var client_id = process.env.UBER_APP_ID,
+        var client_secret = process.env.UBER_APP_PASSWORD,
+        var server_token = process.env.UBER_APP_TOKEN,
         var perference = session.userData.perference;
         var group = session.userData.group;
         var rides = [];
@@ -938,19 +942,19 @@ bot.dialog("/options", [
                     // Check to see if walking or transit step
                     if (transit.transitSteps[step].stepTransitMode == "WALKING") {
                         var walkingStep = transit.transitSteps[step];
-                        directions += walkingStep.stepMainInstruction + " <br/> \n                        - Distance: " + walkingStep.stepDistance + " <br/>\n                        - Duration: " + walkingStep.stepDuration + " <br/>\n                        ";
+                        directions += walkingStep.stepMainInstruction + " <br/> \n            - Distance: " + walkingStep.stepDistance + " <br/>\n            - Duration: " + walkingStep.stepDuration + " <br/>\n            ";
                         for (var step_1 = 0; step_1 < walkingStep.stepDeatiledInstructions.length; step_1++) {
                             if (step_1 == walkingStep.stepDeatiledInstructions.length - 1) {
                                 directions += "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction + " <br/>";
                             }
                             else {
-                                directions += "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction + " <br/> \n                                ";
+                                directions += "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction + " <br/> \n            ";
                             }
                         }
                     }
                     else {
                         var transitStep = transit.transitSteps[step];
-                        directions += transitStep.stepMainInstruction + " <br/>\n                        - Depature Name: " + transitStep.departureStopName + " <br/>\n                        - Deapture Time: " + transitStep.departureStopTime + " <br/>\n                        - Arrival Name: " + transitStep.arrivalStopName + " <br/>\n                        - Arrival Time: " + transitStep.arrivalStopTime + " <br/>\n                        - Distance: " + transitStep.stepDistance + " miles <br/>\n                        - Duration: " + transitStep.stepDuration + " minutes <br/>\n                        - Number of Stops: " + transitStep.numberOfStop + " <br/>\n                        - Vehicle Name: " + transitStep.vehicleName + " <br/>\n                        - Vehicle Type: " + transitStep.vehicleType + " <br/>";
+                        directions += transitStep.stepMainInstruction + " <br/>\n            - Depature Name: " + transitStep.departureStopName + " <br/>\n            - Deapture Time: " + transitStep.departureStopTime + " <br/>\n            - Arrival Name: " + transitStep.arrivalStopName + " <br/>\n            - Arrival Time: " + transitStep.arrivalStopTime + " <br/>\n            - Distance: " + transitStep.stepDistance + " miles <br/>\n                        - Duration: " + transitStep.stepDuration + " minutes <br/>\n                        - Number of Stops: " + transitStep.numberOfStop + " <br/>\n                        - Vehicle Name: " + transitStep.vehicleName + " <br/>\n                        - Vehicle Type: " + transitStep.vehicleType + " <br/>";
                     }
                 }
                 session.send(directions);

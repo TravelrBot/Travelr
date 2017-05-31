@@ -29,13 +29,11 @@ let connector: any = useEmulator ? new builder.ChatConnector() : new botbuilder_
 
 */
 
-let connector: builder.ChatConnector = new builder.ChatConnector({
-    appId: process.env.MICROSOFT_APP_ID,
-    appPassword: process.env.MICROSOFT_APP_PASSWORD
-});
+let connector: builder.ChatConnector = new builder.ChatConnector();
 
 let bot: builder.UniversalBot = new builder.UniversalBot(connector);
 bot.localePath(path.join(__dirname, './locale'));
+
 
 function HtmlParse (html: string): string 
 {
@@ -1405,6 +1403,58 @@ bot.dialog("/options", [
         }     
     }
 ]);
+
+bot.dialog("/Info", [
+    function(session: builder.Session): void
+    {
+        builder.Prompts.choice(session, "What information would you like to see",
+        "Company Info|Privacy|How It Works");
+    },
+
+    function(session:builder.Session, response:builder.IPromptChoiceResult, next)
+    {
+        if(response.response.index == 0)
+        {
+            session.send(`Company Info
+            
+            Travelr is all about creating a more enjoyable commuting experience.
+            
+            We are your urban travel guide to make your daily commute better we match your preferences and find the best options 
+            avialable for you including price, time, group size, and a luxurious option.
+
+            By connecting users to one another we enhance the quality of everyone's dialy commute. This means that every user
+            depending on their choice will be able to find the quickest route, the cheapest ride, or the best luxury deal available.`
+            );
+        }
+
+        else if(response.response.index == 1)
+        {
+            session.send(`Privacy
+            
+            Retainment of information
+
+            This bot is currently in beta. We do not ask for nor retain personal information including but not limited to: Name, DOB, Mailing or Biling Address, etc...
+            Although, not yet implemented, Travelr does intend to eventually retain your starting location, destiantion, and the best services our system produces. 
+            This information will eventually help us with creating a better and faster bot by allowing us to run analysis on the transportation systems in your geographic area.
+
+            Sale of information
+
+            We will not sell the retained informaiton. The informaiton will be used for our own purposes as stated above. We will update our privacy statements accordingly.`);
+        }
+
+        else if(response.response.index == 2)
+        {
+            session.send(`How It Works
+
+            Travelr asks the user for their commuting preferences and then it asks the user for their starting and ending locations. After
+            typing in their preferences and destination our algorithim internally finds the best choice for the user.`)
+        }
+
+        session.replaceDialog("/")
+    },
+
+
+])
 
 if (useEmulator) {
     let server = restify.createServer();

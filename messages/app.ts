@@ -1574,21 +1574,76 @@ bot.dialog("/options", [
                 let pickup: string = LocationAddressFomater(session.userData.start);
                 let dropoff: string = LocationAddressFomater(session.userData.end);
 
-                // Order the Uber
-                session.send("Click the link to open the app and order your ride!");
 
-                let uberString: string = `'https://m.uber.com/ul/?action=setPickup&client_id=${uberClientId}&product_id=${rideshare.proudctId}&pickup[formatted_address]=${pickup}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&dropoff[formatted_address]=${dropoff}&dropoff[latitude]=${endLat}&dropoff[longitude]=${endLong}`;
+                let uberString: string = `https://m.uber.com/ul/?action=setPickup&client_id=${uberClientId}&product_id=${rideshare.proudctId}&pickup[formatted_address]=${pickup}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&dropoff[formatted_address]=${dropoff}&dropoff[latitude]=${endLat}&dropoff[longitude]=${endLong}`;
                 
-                session.send(uberString);
+                let uberCard: builder.Message = new builder.Message(session)
+                    .addAttachment({
+                        contentType: "application/vnd.microsoft.card.adaptive",
+                        content:
+                        {
+                            type: "AdaptiveCard",
+                            body:
+                            [
+                                {
+                                    "type": "TextBlock",
+                                    "text": "Click the image or link to open the app and order your ride!"
+                                },
+                                {
+                                    "type": "Image",
+                                    "url": 'https://d1a3f4spazzrp4.cloudfront.net/uber-com/1.2.29/d1a3f4spazzrp4.cloudfront.net/images/apple-touch-icon-144x144-279d763222.png',
+                                    "size": "small",
+                                    "selectAction": 
+                                    {
+                                        "type": "Action.OpenUrl",
+                                        "title": "Order Uber",
+                                        "url": uberString
+                                    }
+                                }
+                            ]
+                        }
+                    })
+
+                session.send(uberCard);
         }   
 
             else if (rideshare.serviceProvider == 'Lyft')
             {
                 let clientId: string = '9LHHn1wknlgs';
+
+
                 // Order the Lyft
-                session.send("Or click the link to open the app and order your ride!");
                 let lyftString: string = `https://lyft.com/ride?id=${rideshare.proudctId}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&partner=${clientId}&destination[latitude]=${endLat}&destination[longitude]=${endLong}`;
-                session.send(lyftString);
+
+                let lyftCard: builder.Message = new builder.Message(session)
+                    .addAttachment({
+                        contentType: "application/vnd.microsoft.card.adaptive",
+                        content:
+                        {
+                            type: "AdaptiveCard",
+                            body:
+                            [
+                                {
+                                    "type": "TextBlock",
+                                    "text": "Click the image or link to open the app and order your ride!"
+                                },
+
+                                {
+                                    "type": "Image",
+                                    "url": 'https://www.lyft.com/apple-touch-icon-precomposed-152x152.png',
+                                    "size": "small",
+                                    "selectAction": 
+                                    {
+                                        "type": "Action.OpenUrl",
+                                        "title": "Order Lyft",
+                                        "url": lyftString
+                                    }
+                                }
+                            ]
+                        }
+                    })
+
+                session.send(lyftCard)
             }
 
             else

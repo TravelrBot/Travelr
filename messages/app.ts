@@ -1671,7 +1671,7 @@ bot.dialog("/options", [
                     .addAttachment(
                         new builder.ThumbnailCard(session)
                             .title("Order an Uber")
-                            .text("Click to order your uber")
+                            .text("Click to order your Uber in the Uber App!")
                             .images([builder.CardImage.create(session, 'https://d1a3f4spazzrp4.cloudfront.net/uber-com/1.2.29/d1a3f4spazzrp4.cloudfront.net/images/apple-touch-icon-144x144-279d763222.png')])
                             .buttons([builder.CardAction.openUrl(session, uberString, "Order an Uber")])
                             )
@@ -1719,6 +1719,11 @@ bot.dialog("/options", [
                             ]
                         }
                     })
+                .addAttachment(new builder.ThumbnailCard(session)
+                    .title("Order your Lyft!")
+                    .text("Click the button to order your Lyft in the Lyft App!")
+                    .images([builder.CardImage.create(session, "https://www.lyft.com/apple-touch-icon-precomposed-152x152.png")])
+                    .buttons([builder.CardAction.openUrl(session, lyftString, "Order Lyft")]))
 
                 session.send(lyftCard)
             }

@@ -32,7 +32,13 @@ bot.dialog("/", [
         next();
     },
     function(session, response, next)
-    {
+    {   
+        var msg = new builder.Message(session)
+            .addAttachment(new builder.ThumbnailCard(session)
+                .buttons([new builder.CardAction.openUrl(session, "http://google.com", "Google")])
+                .title("Test")
+                .text('This is a thumnail card test'));
+        session.send(msg);
         session.send(session.message.source);
     }
 ]);

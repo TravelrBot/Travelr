@@ -29,6 +29,7 @@ var bot = new builder.UniversalBot(connector);
 bot.dialog("/", [
     function(session: builder.Session)
     {
+        
         session.send(session.message.source);
     }
 ])

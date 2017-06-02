@@ -1,14 +1,34 @@
-import * as request from 'request';
-'https://maps.googleapis.com/maps/api/geocode/json?latlng=40.714224,-73.961452&key=YOUR_API_KEY';
+import * as builder from "botbuilder";
+import * as restify from "restify";
+import * as request from "request";
+import * as googleMaps from "@google/maps";
+import {Uber} from "./uber";
+import {Lyft} from "./lyft";
+import {Results} from "./results";
+import {Transit} from "./transit";
+import * as process from "process";
+import * as path from "path";
 
-let start_lat: number = 40.714224;
-let start_long: number = -73.961452;
-let key: string = 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4';
-let result_type_1: string = 'administrative_area_level_1';
-let result_type_2: string = 'administrative_area_level_2';
-let result_type_3: string = 'administrative_area_level_3';
+// Setup Restify Server
+var server = restify.createServer();
+server.listen(process.env.port || process.env.PORT || 3978, function () {
+   console.log('%s listening to %s', server.name, server.url); 
+});
 
+// Create chat connector for communicating with the Bot Framework Service
+var connector = new builder.ChatConnector({
+    appId: '',
+    appPassword: ''
+});
 
-let car2go_location_url: string = 'http://www.car2go.com/api/v2.1/locations?format=json';
+// Listen for messages from users 
+server.post('/api/messages', connector.listen());
 
+var bot = new builder.UniversalBot(connector);
 
+bot.dialog("/", [
+    function(session: builder.Session)
+    {
+        session.send(session.message.source);
+    }
+])

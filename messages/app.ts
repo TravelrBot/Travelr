@@ -1229,135 +1229,184 @@ bot.dialog('/', [
                 proudctId: uber.uber_productId
             };
         }
-
-        // Build the transit string 
-        let transitMessage: any[];
-        
-        if (transitInfo.transitDistance == "Error")
+////////////////////////////////////////////
+//                                       //
+//          BUILD THE MESSAGES           //   
+//                                       //
+///////////////////////////////////////////
+        if (session.message.source != 'skype')
         {
-            transitMessage = 
-            [
-                {   "type": "TextBlock",
-                    "text": "Transit Not Found",
-                    "size": "medium",
-                    "weight": "bolder"
-                }
-            ]
-        }
-        else
-        {
-            transitMessage = 
-            [
-                {   "type": "TextBlock",
-                    "text": "Transit",
-                    "size": "medium",
-                    "weight": "bolder"
-                },
-                {
-                    "type": "TextBlock",
-                    "text": `- Departure Time: ${transitInfo.transitDepartureTime}`
-                },
-                {
-                    "type": "TextBlock",
-                    "text": `- Arrival Time: ${transitInfo.transitArrivalTime}`
-                },
-                {
-                    "type": "TextBlock",
-                    "text": `- Distance: ${transitInfo.transitDistance} miles`
-                },
-                {
-                    "type": "TextBlock",
-                    "text": `- Duration: ${transitInfo.transitDuration}`
-                }
-            ]
+            // Build the transit string 
+            let transitMessage: any[] = [];
+            // Check to see if there is an error with the ridesharing 
+            let rideshareMessage: any[] = [];
+            
+            if (transitInfo.transitDistance == "Error")
+            {
+                transitMessage = 
+                [
+                    {   "type": "TextBlock",
+                        "text": "Transit Not Found",
+                        "size": "medium",
+                        "weight": "bolder"
+                    }
+                ]                   
+            }
+            else
+            {
+                transitMessage = 
+                [
+                    {   "type": "TextBlock",
+                        "text": "Transit",
+                        "size": "medium",
+                        "weight": "bolder"
+                    },
+                    {
+                        "type": "TextBlock",
+                        "text": `- Departure Time: ${transitInfo.transitDepartureTime}`
+                    },
+                    {
+                        "type": "TextBlock",
+                        "text": `- Arrival Time: ${transitInfo.transitArrivalTime}`
+                    },
+                    {
+                        "type": "TextBlock",
+                        "text": `- Distance: ${transitInfo.transitDistance} miles`
+                    },
+                    {
+                        "type": "TextBlock",
+                        "text": `- Duration: ${transitInfo.transitDuration}`
+                    }
+                ]
+            }
 
-        // Check to see if there is an error with the ridesharing 
-        let rideshareMessage: any[];
 
-        if (rideshare.serviceType == "Error")
-        {
+            if (rideshare.serviceType == "Error")
+            {
 
-            rideshareMessage = 
-            [
-                {
-                    "type": "TextBlock",
-                    "text": "Rideshare Not Found",
-                    "size": "medium",
-                    "weight": "bolder"
-                }
-            ]
-        }
-        else
-        {
-            rideshareMessage = 
-            [
-                {   "type": "TextBlock",
-                    "text": "Rideshare",
-                    "size": "medium",
-                    "weight": "bolder"
-                },
-                {
-                    "type": "TextBlock",
-                    "text": `- Service: ${rideshare.serviceProvider}`
-                },
-                {
-                    "type": "TextBlock",
-                    "text": `- Ride Type: ${rideshare.serviceType}`
-                },
-                {
-                    "type": "TextBlock",
-                    "text": `- Price: $${rideshare.price}`
-                },
-                {
-                    "type": "TextBlock",
-                    "text": `- Driver Distance: ${rideshare.driverTime} minutes away`
-                },
-                {
-                    "type": "TextBlock",
-                    "text": `- Total Distance: ${rideshare.totalDistance} miles`
-                },
-                {
-                    "type": "TextBlock",
-                    "text": `- Total Duration: ${rideshare.totalTime} minutes`
-                }
-            ]
-        }
-        
-        let masterMessage = new builder.Message(session)
-            .addAttachment({
-                contentType: "application/vnd.microsoft.card.adaptive",
-                content: {
-                    type: 'AdaptiveCard',
-                    body: [
-                                {
-                                "type": "Container",
-                                "separation": "default",
-                                "items":[
+                rideshareMessage = 
+                [
+                    {
+                        "type": "TextBlock",
+                        "text": "Rideshare Not Found",
+                        "size": "medium",
+                        "weight": "bolder"
+                    }
+                ]
+            }
+            else
+            {
+                rideshareMessage = 
+                [
+                    {   "type": "TextBlock",
+                        "text": "Rideshare",
+                        "size": "medium",
+                        "weight": "bolder"
+                    },
+                    {
+                        "type": "TextBlock",
+                        "text": `- Service: ${rideshare.serviceProvider}`
+                    },
+                    {
+                        "type": "TextBlock",
+                        "text": `- Ride Type: ${rideshare.serviceType}`
+                    },
+                    {
+                        "type": "TextBlock",
+                        "text": `- Price: $${rideshare.price}`
+                    },
+                    {
+                        "type": "TextBlock",
+                        "text": `- Driver Distance: ${rideshare.driverTime} minutes away`
+                    },
+                    {
+                        "type": "TextBlock",
+                        "text": `- Total Distance: ${rideshare.totalDistance} miles`
+                    },
+                    {
+                        "type": "TextBlock",
+                        "text": `- Total Duration: ${rideshare.totalTime} minutes`
+                    }
+                ]
+            }
+
+            let masterMessage = new builder.Message(session)
+                .addAttachment({
+                    contentType: "application/vnd.microsoft.card.adaptive",
+                    content: {
+                        type: 'AdaptiveCard',
+                        body: [
                                     {
-                                        "type": "TextBlock",
-                                        "text": "Transportation Options",
-                                        "size": "large",
-                                        "weight": "bolder"
+                                    "type": "Container",
+                                    "separation": "default",
+                                    "items":[
+                                        {
+                                            "type": "TextBlock",
+                                            "text": "Transportation Options",
+                                            "size": "large",
+                                            "weight": "bolder"
+                                        }
+                                    ]
+                                    },
+                                    {
+                                        "type": "Container",
+                                        "separation": "default",
+                                        "style": "normal",
+                                        "items": transitMessage
+                                    },
+                                    {
+                                        "type": "Container",
+                                        "separation": "default",
+                                        "items": rideshareMessage
                                     }
-                                ]
-                                },
-                                {
-                                    "type": "Container",
-                                    "separation": "default",
-                                    "style": "normal",
-                                    "items": transitMessage
-                                },
-                                {
-                                    "type": "Container",
-                                    "separation": "default",
-                                    "items": rideshareMessage
-                                }
-                            ]   
-                        }
-                    })
+                                ]   
+                            }
+                        })
 
-        session.send(masterMessage);
+            session.send(masterMessage);
+        }
 
+        else // the message is for skype
+        {
+            // Build the transit string 
+            let transitString: string;
+            
+            if (transitInfo.transitDistance == "Error")
+            {
+                transitString = 'We could not find transit in this area <br/> <br/>';
+            }
+            else
+            {
+                // Build out the strings
+                transitString = `Transit <br/>
+                - Departure Time: ${transitInfo.transitDepartureTime} <br/>
+                - Arrival Time: ${transitInfo.transitArrivalTime} <br/>
+                - Distance: ${transitInfo.transitDistance} miles <br/>
+                - Duration ${transitInfo.transitDuration} minutes <br/>`;
+            }
+            
+            // Check to see if there is an error with the ridesharing 
+            let rideshareString: string;
+
+            if (rideshare.serviceType == "Error")
+            {
+                rideshareString = "We could not find any rideharing options";
+            }
+            else
+            {
+                rideshareString = `Rideshare <br/>
+                - Service: ${rideshare.serviceProvider} <br/>
+                - Ride Type: ${rideshare.serviceType} <br/>
+                - Price: ${rideshare.price} <br/>
+                - Driver Distance: ${rideshare.driverTime} minutes away <br/>
+                - Total Distance: ${rideshare.totalDistance} miles <br/>
+                - Total Duration: ${rideshare.totalTime} minutes <br/>`;
+            }
+            
+
+            session.send(transitString + rideshareString);
+        }
+        
         // Add the options to the userdata
         session.userData.Rideshare = rideshare;
 
@@ -1365,7 +1414,7 @@ bot.dialog('/', [
 
     }
 
-}])  
+])  
 
 // Dialogue for infomation 
 bot.dialog("/options", [
@@ -1558,8 +1607,8 @@ bot.dialog("/options", [
 
                 // repeat the dialog
                 session.replaceDialog('/options');
+                
             }
-
         }
 
         // User want ridesharing information
@@ -1599,10 +1648,22 @@ bot.dialog("/options", [
                                         "title": "Order Uber",
                                         "url": uberString
                                     }
+                                }, 
+                                {
+                                    "type": "Action.OpenUrl",
+                                    "title": "Order an Uber",
+                                    "url": uberString
                                 }
                             ]
                         }
                     })
+                    .addAttachment(
+                        new builder.ThumbnailCard(session)
+                            .title("Order an Uber")
+                            .text("Click to order your uber")
+                            .images([builder.CardImage.create(session, 'https://d1a3f4spazzrp4.cloudfront.net/uber-com/1.2.29/d1a3f4spazzrp4.cloudfront.net/images/apple-touch-icon-144x144-279d763222.png')])
+                            .buttons([builder.CardAction.openUrl(session, uberString, "Order an Uber")])
+                            )
 
                 session.send(uberCard);
         }   
@@ -1638,6 +1699,11 @@ bot.dialog("/options", [
                                         "title": "Order Lyft",
                                         "url": lyftString
                                     }
+                                }, 
+                                {
+                                    "type": "Action.OpenUrl",
+                                    "title": "Order an Lyft",
+                                    "url": lyftString
                                 }
                             ]
                         }

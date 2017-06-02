@@ -1231,42 +1231,132 @@ bot.dialog('/', [
         }
 
         // Build the transit string 
-        let transitString: string;
+        let transitMessage: any[];
         
         if (transitInfo.transitDistance == "Error")
         {
-            transitString = 'We could not find transit in this area <br/> <br/>';
+            transitMessage = 
+            [
+                {   "type": "TextBlock",
+                    "text": "Transit Not Found",
+                    "size": "medium",
+                    "weight": "bolder"
+                }
+            ]
         }
         else
         {
-            // Build out the strings
-            transitString = `Transit <br/>
-            - Departure Time: ${transitInfo.transitDepartureTime} <br/>
-            - Arrival Time: ${transitInfo.transitArrivalTime} <br/>
-            - Distance: ${transitInfo.transitDistance} miles <br/>
-            - Duration ${transitInfo.transitDuration} minutes <br/>`;
-        }
-        
+            transitMessage = 
+            [
+                {   "type": "TextBlock",
+                    "text": "Transit",
+                    "size": "medium",
+                    "weight": "bolder"
+                },
+                {
+                    "type": "TextBlock",
+                    "text": `- Departure Time: ${transitInfo.transitDepartureTime}`
+                },
+                {
+                    "type": "TextBlock",
+                    "text": `- Arrival Time: ${transitInfo.transitArrivalTime}`
+                },
+                {
+                    "type": "TextBlock",
+                    "text": `- Distance: ${transitInfo.transitDistance} miles`
+                },
+                {
+                    "type": "TextBlock",
+                    "text": `- Duration: ${transitInfo.transitDuration}`
+                }
+            ]
+
         // Check to see if there is an error with the ridesharing 
-        let rideshareString: string;
+        let rideshareMessage: any[];
 
         if (rideshare.serviceType == "Error")
         {
-            rideshareString = "We could not find any rideharing options";
+
+            rideshareMessage = 
+            [
+                {
+                    "type": "TextBlock",
+                    "text": "Rideshare Not Found",
+                    "size": "medium",
+                    "weight": "bolder"
+                }
+            ]
         }
         else
         {
-            rideshareString = `Rideshare <br/>
-            - Service: ${rideshare.serviceProvider} <br/>
-            - Ride Type: ${rideshare.serviceType} <br/>
-            - Price: ${rideshare.price} <br/>
-            - Driver Distance: ${rideshare.driverTime} minutes away <br/>
-            - Total Distance: ${rideshare.totalDistance} miles <br/>
-            - Total Duration: ${rideshare.totalTime} minutes <br/>`;
+            rideshareMessage = 
+            [
+                {   "type": "TextBlock",
+                    "text": "Rideshare",
+                    "size": "medium",
+                    "weight": "bolder"
+                },
+                {
+                    "type": "TextBlock",
+                    "text": `- Service: ${rideshare.serviceProvider}`
+                },
+                {
+                    "type": "TextBlock",
+                    "text": `- Ride Type: ${rideshare.serviceType}`
+                },
+                {
+                    "type": "TextBlock",
+                    "text": `- Price: $${rideshare.price}`
+                },
+                {
+                    "type": "TextBlock",
+                    "text": `- Driver Distance: ${rideshare.driverTime} minutes away`
+                },
+                {
+                    "type": "TextBlock",
+                    "text": `- Total Distance: ${rideshare.totalDistance} miles`
+                },
+                {
+                    "type": "TextBlock",
+                    "text": `- Total Duration: ${rideshare.totalTime} minutes`
+                }
+            ]
         }
         
+        let masterMessage = new builder.Message(session)
+            .addAttachment({
+                contentType: "application/vnd.microsoft.card.adaptive",
+                content: {
+                    type: 'AdaptiveCard',
+                    body: [
+                                {
+                                "type": "Container",
+                                "separation": "default",
+                                "items":[
+                                    {
+                                        "type": "TextBlock",
+                                        "text": "Transportation Options",
+                                        "size": "large",
+                                        "weight": "bolder"
+                                    }
+                                ]
+                                },
+                                {
+                                    "type": "Container",
+                                    "separation": "default",
+                                    "style": "normal",
+                                    "items": transitMessage
+                                },
+                                {
+                                    "type": "Container",
+                                    "separation": "default",
+                                    "items": rideshareMessage
+                                }
+                            ]   
+                        }
+                    })
 
-        session.send(transitString + rideshareString);
+        session.send(masterMessage);
 
         // Add the options to the userdata
         session.userData.Rideshare = rideshare;
@@ -1275,7 +1365,7 @@ bot.dialog('/', [
 
     }
 
-])  
+}])  
 
 // Dialogue for infomation 
 bot.dialog("/options", [
@@ -1306,7 +1396,7 @@ bot.dialog("/options", [
             else
             {
                 // Array to Hold all direction string 
-                let directions: string = "";
+                let stepMessage: any[] = [];
 
                 for (let step: number = 0; step < transit.transitSteps.length; step++) 
                 {
@@ -1315,47 +1405,160 @@ bot.dialog("/options", [
                     {
                         let walkingStep: Transit.IStepWalkingInfo = transit.transitSteps[step] as Transit.IStepWalkingInfo;
 
-                        directions += `${walkingStep.stepMainInstruction} <br/> 
-                        - Distance: ${walkingStep.stepDistance} <br/>
-                        - Duration: ${walkingStep.stepDuration} <br/>
-                        `;
+                        let instructions = 
+                        [
+                            {
+                                "type": "TextBlock",
+                                "text": `${walkingStep.stepMainInstruction}`,
+                                "size": "medium",
+                                "weight": "bolder",
+                                "wrap": true
+
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": `- Distance: ${walkingStep.stepDistance}`,
+                                "wrap": true
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": `- Duration: ${walkingStep.stepDuration}`,
+                                "wrap": true
+                            }
+                        ]
+
 
                         for (let step: number = 0; step < walkingStep.stepDeatiledInstructions.length; step++)
                         {
                             if (step == walkingStep.stepDeatiledInstructions.length - 1)
                             {
-                                directions += `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction} <br/>`;
+                                instructions.push(
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction}`,
+                                        "wrap": true   
+                                    }
+                                );
                             }
                             else
                             {
-                                directions += `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction} <br/> 
-                                `;
+                                instructions.push(
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction}` ,
+                                        "wrap": true  
+                                    });
                             }
                         }
+
+                        instructions.forEach(step => {
+                            stepMessage.push(step);
+                        });
                     }
 
                     else
                     {
                         let transitStep: Transit.IStepTransitInfo = transit.transitSteps[step] as Transit.IStepTransitInfo;
-                        
-                        directions += `${transitStep.stepMainInstruction} <br/>
-                        - Depature Name: ${transitStep.departureStopName} <br/>
-                        - Deapture Time: ${transitStep.departureStopTime} <br/>
-                        - Arrival Name: ${transitStep.arrivalStopName} <br/>
-                        - Arrival Time: ${transitStep.arrivalStopTime} <br/>
-                        - Distance: ${transitStep.stepDistance} miles <br/>
-                        - Duration: ${transitStep.stepDuration} minutes <br/>
-                        - Number of Stops: ${transitStep.numberOfStop} <br/>
-                        - Vehicle Name: ${transitStep.vehicleName} <br/>
-                        - Vehicle Type: ${transitStep.vehicleType} <br/>`
+                        let transitMessage: any[] = 
+                        [
+                            {
+                                "type": "TextBlock",
+                                "text": `${transitStep.stepMainInstruction}`,
+                                "size": "medium",
+                                "weight": "bolder",
+                                "wrap": true   
+
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": `- Depature Name: ${transitStep.departureStopName}`,
+                                "wrap": true  
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": `- Deapture Time: ${transitStep.departureStopTime}`,
+                                "wrap": true  
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": `- Arrival Name: ${transitStep.arrivalStopName}`,
+                                "wrap": true  
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": `- Arrival Time: ${transitStep.arrivalStopTime}`,
+                                "wrap": true  
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": `- Distance: ${transitStep.stepDistance} miles`,
+                                "wrap": true  
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": `- Duration: ${transitStep.stepDuration} minutes`,
+                                "wrap": true  
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": `- Number of Stops: ${transitStep.numberOfStop}`,
+                                "wrap": true  
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": `- Vehicle Name: ${transitStep.vehicleName} `,
+                                "wrap": true  
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": `- Vehicle Type: ${transitStep.vehicleType}`,
+                                "wrap": true  
+                            }
+                        ];
+
+                        transitMessage.forEach(step => {
+                            stepMessage.push(step);
+                        })
+
                     }
                 }
 
-                session.send(directions);
+                // Build the step by step directions
+                let directionMessage: builder.Message = new builder.Message(session)
+                    .addAttachment({
+                        contentType: "application/vnd.microsoft.card.adaptive",
+                        content: 
+                        {
+                            type: 'AdaptiveCard',
+                            body: 
+                            [
+                                {
+                                    "type": "Container",
+                                    "separation": "default",
+                                    "items":
+                                    [
+                                        {
+                                            "type": "TextBlock",
+                                            "text": "Transit Steps",
+                                            "size": "large",
+                                            "weight": "bolder"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "Container",
+                                    "items": stepMessage
+                                }
+                                        
+                            ]   
+                        }
+                    })
+
+                session.send(directionMessage);
 
                 // repeat the dialog
                 session.replaceDialog('/options');
-        }
+            }
 
         }
 

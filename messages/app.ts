@@ -1243,6 +1243,7 @@ bot.dialog('/', [
             
             if (transitInfo.transitDistance == "Error")
             {
+                console.log("Building the transit error message");
                 transitMessage = 
                 [
                     {   "type": "TextBlock",
@@ -1253,7 +1254,7 @@ bot.dialog('/', [
                 ]                   
             }
             else
-            {
+            {   console.log("Building the transit message");
                 transitMessage = 
                 [
                     {   "type": "TextBlock",
@@ -1283,7 +1284,7 @@ bot.dialog('/', [
 
             if (rideshare.serviceType == "Error")
             {
-
+                console.log("Building the rideshare error message");
                 rideshareMessage = 
                 [
                     {
@@ -1296,6 +1297,7 @@ bot.dialog('/', [
             }
             else
             {
+                console.log("Building the rideshare message");
                 rideshareMessage = 
                 [
                     {   "type": "TextBlock",
@@ -1329,6 +1331,8 @@ bot.dialog('/', [
                     }
                 ]
             }
+            // Send the master message
+            console.log("Building the master message");
 
             let masterMessage = new builder.Message(session)
                 .addAttachment({
@@ -1372,12 +1376,15 @@ bot.dialog('/', [
             let transitString: string;
             
             if (transitInfo.transitDistance == "Error")
-            {
+            {   
+                console.log("Building skype error string");
                 transitString = 'We could not find transit in this area <br/> <br/>';
             }
             else
             {
                 // Build out the strings
+                console.log("Building transit string");
+
                 transitString = `Transit <br/>
                 - Departure Time: ${transitInfo.transitDepartureTime} <br/>
                 - Arrival Time: ${transitInfo.transitArrivalTime} <br/>
@@ -1389,11 +1396,15 @@ bot.dialog('/', [
             let rideshareString: string;
 
             if (rideshare.serviceType == "Error")
-            {
+            {   
+                console.log("Building rideshare error string");
+
                 rideshareString = "We could not find any rideharing options";
             }
             else
             {
+                console.log("Building rideshare string");
+                
                 rideshareString = `Rideshare <br/>
                 - Service: ${rideshare.serviceProvider} <br/>
                 - Ride Type: ${rideshare.serviceType} <br/>

@@ -62,11 +62,12 @@ bot.dialog('/', [
     // send the intro
     function (session, args, next) {
         session.send("Hello and welcome to Travelr! We just need a few details to get you to your destination!");
-        next();
-    },
-    // Get the user's preference
+        session.replaceDialog("/preferences");
+    }
+]);
+bot.dialog('/preferences', [
     function (session) {
-        builder.Prompts.choice(session, "What is your preference on transportation?", "Value|Time|Luxury");
+        builder.Prompts.choice(session, "What is your preference on transportation", ["Value", "Time", "luxury"]);
     },
     // Save the perference 
     function (session, result, next) {
@@ -102,8 +103,15 @@ bot.dialog('/', [
                 break;
         }
         // Go to the next step
-        next();
-    },
+        session.replaceDialog('/locations');
+    }
+]).reloadAction("reloadPreferences", "Restarting Preference Gathering", {
+    matches: /^start over/i,
+    onSelectAction: function (session) {
+        session.beginDialog("/references");
+    }
+});
+bot.dialog("/locations", [
     // get the user's starting location
     function (session) {
         builder.Prompts.text(session, "What is your starting location?");
@@ -158,7 +166,9 @@ bot.dialog('/', [
                 console.log();
             }
         });
-    },
+    }
+]);
+bot.dialog('/calculation', [
     //=========================================================
     // Map information 
     //=========================================================
@@ -891,46 +901,56 @@ bot.dialog('/', [
                     proudctId: uber.uber_productId
                 };
         }
-        // Build the transit string 
-        var transitMessage;
-        if (transitInfo.transitDistance == "Error") {
-            transitMessage =
-                [
-                    { "type": "TextBlock",
-                        "text": "Transit Not Found",
-                        "size": "medium",
-                        "weight": "bolder"
-                    }
-                ];
-        }
-        else {
-            transitMessage =
-                [
-                    { "type": "TextBlock",
-                        "text": "Transit",
-                        "size": "medium",
-                        "weight": "bolder"
-                    },
-                    {
-                        "type": "TextBlock",
-                        "text": "- Departure Time: " + transitInfo.transitDepartureTime
-                    },
-                    {
-                        "type": "TextBlock",
-                        "text": "- Arrival Time: " + transitInfo.transitArrivalTime
-                    },
-                    {
-                        "type": "TextBlock",
-                        "text": "- Distance: " + transitInfo.transitDistance + " miles"
-                    },
-                    {
-                        "type": "TextBlock",
-                        "text": "- Duration: " + transitInfo.transitDuration
-                    }
-                ];
+        ////////////////////////////////////////////
+        //                                       //
+        //          BUILD THE MESSAGES           //   
+        //                                       //
+        ///////////////////////////////////////////
+        if (session.message.source != 'skype') {
+            // Build the transit string 
+            var transitMessage = [];
             // Check to see if there is an error with the ridesharing 
-            var rideshareMessage = void 0;
+            var rideshareMessage = [];
+            if (transitInfo.transitDistance == "Error") {
+                console.log("Building the transit error message");
+                transitMessage =
+                    [
+                        { "type": "TextBlock",
+                            "text": "Transit Not Found",
+                            "size": "medium",
+                            "weight": "bolder"
+                        }
+                    ];
+            }
+            else {
+                console.log("Building the transit message");
+                transitMessage =
+                    [
+                        { "type": "TextBlock",
+                            "text": "Transit",
+                            "size": "medium",
+                            "weight": "bolder"
+                        },
+                        {
+                            "type": "TextBlock",
+                            "text": "- Departure Time: " + transitInfo.transitDepartureTime
+                        },
+                        {
+                            "type": "TextBlock",
+                            "text": "- Arrival Time: " + transitInfo.transitArrivalTime
+                        },
+                        {
+                            "type": "TextBlock",
+                            "text": "- Distance: " + transitInfo.transitDistance + " miles"
+                        },
+                        {
+                            "type": "TextBlock",
+                            "text": "- Duration: " + transitInfo.transitDuration
+                        }
+                    ];
+            }
             if (rideshare.serviceType == "Error") {
+                console.log("Building the rideshare error message");
                 rideshareMessage =
                     [
                         {
@@ -942,6 +962,7 @@ bot.dialog('/', [
                     ];
             }
             else {
+                console.log("Building the rideshare message");
                 rideshareMessage =
                     [
                         { "type": "TextBlock",
@@ -975,6 +996,8 @@ bot.dialog('/', [
                         }
                     ];
             }
+            // Send the master message
+            console.log("Building the master message");
             var masterMessage = new builder.Message(session)
                 .addAttachment({
                 contentType: "application/vnd.microsoft.card.adaptive",
@@ -1008,10 +1031,34 @@ bot.dialog('/', [
                 }
             });
             session.send(masterMessage);
-            // Add the options to the userdata
-            session.userData.Rideshare = rideshare;
-            session.replaceDialog("/options");
         }
+        else {
+            // Build the transit string 
+            var transitString = void 0;
+            if (transitInfo.transitDistance == "Error") {
+                console.log("Building skype error string");
+                transitString = 'We could not find transit in this area <br/> <br/>';
+            }
+            else {
+                // Build out the strings
+                console.log("Building transit string");
+                transitString = "Transit <br/>\n                - Departure Time: " + transitInfo.transitDepartureTime + " <br/>\n                - Arrival Time: " + transitInfo.transitArrivalTime + " <br/>\n                - Distance: " + transitInfo.transitDistance + " miles <br/>\n                - Duration " + transitInfo.transitDuration + " minutes <br/>";
+            }
+            // Check to see if there is an error with the ridesharing 
+            var rideshareString = void 0;
+            if (rideshare.serviceType == "Error") {
+                console.log("Building rideshare error string");
+                rideshareString = "We could not find any rideharing options";
+            }
+            else {
+                console.log("Building rideshare string");
+                rideshareString = "Rideshare <br/>\n                - Service: " + rideshare.serviceProvider + " <br/>\n                - Ride Type: " + rideshare.serviceType + " <br/>\n                - Price: " + rideshare.price + " <br/>\n                - Driver Distance: " + rideshare.driverTime + " minutes away <br/>\n                - Total Distance: " + rideshare.totalDistance + " miles <br/>\n                - Total Duration: " + rideshare.totalTime + " minutes <br/>";
+            }
+            session.send(transitString + rideshareString);
+        }
+        // Add the options to the userdata
+        session.userData.Rideshare = rideshare;
+        session.replaceDialog("/options");
     }
 ]);
 // Dialogue for infomation 
@@ -1177,8 +1224,6 @@ bot.dialog("/options", [
                 // Format the addresses
                 var pickup = LocationAddressFomater(session.userData.start);
                 var dropoff = LocationAddressFomater(session.userData.end);
-                // Order the Uber
-                session.send("Click the link to open the app and order your ride!");
                 var uberString = "https://m.uber.com/ul/?action=setPickup&client_id=" + uberClientId + "&product_id=" + rideshare.proudctId + "&pickup[formatted_address]=" + pickup + "&pickup[latitude]=" + startLat + "&pickup[longitude]=" + startLong + "&dropoff[formatted_address]=" + dropoff + "&dropoff[latitude]=" + endLat + "&dropoff[longitude]=" + endLong;
                 var uberCard = new builder.Message(session)
                     .addAttachment({
@@ -1186,6 +1231,10 @@ bot.dialog("/options", [
                     content: {
                         type: "AdaptiveCard",
                         body: [
+                            {
+                                "type": "TextBlock",
+                                "text": "Click the image or link to open the app and order your ride!"
+                            },
                             {
                                 "type": "Image",
                                 "url": 'https://d1a3f4spazzrp4.cloudfront.net/uber-com/1.2.29/d1a3f4spazzrp4.cloudfront.net/images/apple-touch-icon-144x144-279d763222.png',
@@ -1195,16 +1244,25 @@ bot.dialog("/options", [
                                     "title": "Order Uber",
                                     "url": uberString
                                 }
+                            },
+                            {
+                                "type": "Action.OpenUrl",
+                                "title": "Order an Uber",
+                                "url": uberString
                             }
                         ]
                     }
-                });
+                })
+                    .addAttachment(new builder.ThumbnailCard(session)
+                    .title("Order an Uber")
+                    .text("Click to order your Uber in the Uber App!")
+                    .images([builder.CardImage.create(session, 'https://d1a3f4spazzrp4.cloudfront.net/uber-com/1.2.29/d1a3f4spazzrp4.cloudfront.net/images/apple-touch-icon-144x144-279d763222.png')])
+                    .buttons([builder.CardAction.openUrl(session, uberString, "Order an Uber")]));
                 session.send(uberCard);
             }
             else if (rideshare.serviceProvider == 'Lyft') {
                 var clientId = '9LHHn1wknlgs';
                 // Order the Lyft
-                session.send("Or click the link to open the app and order your ride!");
                 var lyftString = "https://lyft.com/ride?id=" + rideshare.proudctId + "&pickup[latitude]=" + startLat + "&pickup[longitude]=" + startLong + "&partner=" + clientId + "&destination[latitude]=" + endLat + "&destination[longitude]=" + endLong;
                 var lyftCard = new builder.Message(session)
                     .addAttachment({
@@ -1212,6 +1270,10 @@ bot.dialog("/options", [
                     content: {
                         type: "AdaptiveCard",
                         body: [
+                            {
+                                "type": "TextBlock",
+                                "text": "Click the image or link to open the app and order your ride!"
+                            },
                             {
                                 "type": "Image",
                                 "url": 'https://www.lyft.com/apple-touch-icon-precomposed-152x152.png',
@@ -1221,10 +1283,20 @@ bot.dialog("/options", [
                                     "title": "Order Lyft",
                                     "url": lyftString
                                 }
+                            },
+                            {
+                                "type": "Action.OpenUrl",
+                                "title": "Order an Lyft",
+                                "url": lyftString
                             }
                         ]
                     }
-                });
+                })
+                    .addAttachment(new builder.ThumbnailCard(session)
+                    .title("Order your Lyft!")
+                    .text("Click the button to order your Lyft in the Lyft App!")
+                    .images([builder.CardImage.create(session, "https://www.lyft.com/apple-touch-icon-precomposed-152x152.png")])
+                    .buttons([builder.CardAction.openUrl(session, lyftString, "Order Lyft")]));
                 session.send(lyftCard);
             }
             else {

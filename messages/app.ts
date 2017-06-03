@@ -84,6 +84,15 @@ function LocationAddressFomater (address: string): string
     return formattedAddress;
 }
 
+//=========================================================
+// Trigger Dialogs
+//=========================================================
+bot.dialog("/cancel", [
+    function (session: builder.Session)
+    {
+        session.endConversation("Thank you for using Travelr!")
+    }
+]).triggerAction();
 
 //=========================================================
 // Bots Dialogs
@@ -94,18 +103,17 @@ bot.dialog('/', [
     function (session: builder.Session, args: any, next: any): void
     {
         session.send("Hello and welcome to Travelr! We just need a few details to get you to your destination!");
-        next();
-    },
+        session.replaceDialog("/preferences");
+    }
+])
 
-    // Get the user's preference
-    function (session: builder.Session): void {
-        builder.Prompts.choice(session, "What is your preference on transportation?",
-        "Value|Time|Luxury");
-    }, 
-    
+bot.dialog('/preferences', [
+    function (session: builder.Session)
+    {
+        builder.Prompts.choice(session, "What is your preference on transportation", ["Value", "Time", "luxury"]);
+    },
     // Save the perference 
-    function (session: builder.Session, result: builder.IPromptChoiceResult, 
-    next: Function) : void
+    function (session: builder.Session, result: builder.IPromptChoiceResult, next: any)
     {
         switch (result.response.index) 
         {
@@ -124,14 +132,12 @@ bot.dialog('/', [
 
         next();
     },
-
     // Ask about seating preferences
     function (session: builder.Session): void
     {
         builder.Prompts.choice(session, "Do you have more than 4 people?",
         "Yes|No");
     },
-
     function (session: builder.Session, result: builder.IPromptChoiceResult,
     next: Function): void
     {
@@ -148,11 +154,30 @@ bot.dialog('/', [
         }
 
         // Go to the next step
-        next();
-    },
+        session.replaceDialog('locations');
+    }
+
+    
+]).cancelAction('cancelPreferences', "Operation Canceled",{
+    matches: /^cancel/i,
+    confirmPrompt: "Are you sure?",
+    onSelectAction: function(session)
+    {
+        console.log("Action Canceled")
+    }
+}).reloadAction("reloadPreferences", "Restarting Preference Gathering", {
+    matches: /^start over/i,
+    onSelectAction: function(session)
+    {
+        session.beginDialog("/preferences");
+    }
+})
+
+bot.dialog("/locations", [
 
     // get the user's starting location
-    function(session: builder.Session): void{
+    function(session: builder.Session): void
+    {
         builder.Prompts.text(session, "What is your starting location?");
     },
 
@@ -237,15 +262,18 @@ bot.dialog('/', [
                 }
             }
         )
-    }, 
 
+        session.beginDialog("/calculation");
+    }
+])
+
+bot.dialog('/calculation',[
 //=========================================================
 // Map information 
 //=========================================================
 
-
     // Begin processing the information
-    function (session: builder.Session, args: any, next: Function): void
+    function (session: builder.Session, args: any, next: any): void
     {
         session.send("Hold on while we get your results");
 
@@ -1423,9 +1451,9 @@ bot.dialog('/', [
 
         session.replaceDialog("/options");
 
-    }
+    } 
+])
 
-])  
 
 // Dialogue for infomation 
 bot.dialog("/options", [

@@ -92,7 +92,18 @@ bot.dialog("/cancel", [
     {
         session.endConversation("Thank you for using Travelr!")
     }
-]).triggerAction();
+]).triggerAction({
+    confirmPrompt: "Are you sure you want to cancel?",
+    matches: /^cancel/i,
+})
+
+bot.dialog("/recalculate", [
+    function(session: builder.Session)
+    {
+        session.replaceDialog("/calculation");
+    }
+]).triggerAction({confirmPrompt:"Are you sure you want to rerun?", matches: [/^rerun/i, /^recalculate/i]})
+
 
 //=========================================================
 // Bots Dialogs
@@ -102,7 +113,7 @@ bot.dialog('/', [
     // send the intro
     function (session: builder.Session, args: any, next: any): void
     {
-        session.send("Hello and welcome to Travelr! We just need a few details to get you to your destination!");
+        session.send("Hello and welcome to Travelr! We just need a few details to get you to your destination! You can say cancel or restart to redo your current step.");
         session.replaceDialog("/preferences");
     }
 ])
@@ -154,23 +165,12 @@ bot.dialog('/preferences', [
         }
 
         // Go to the next step
-        session.replaceDialog('locations');
+        session.replaceDialog('/locations');
     }
 
     
-]).cancelAction('cancelPreferences', "Operation Canceled",{
-    matches: /^cancel/i,
-    confirmPrompt: "Are you sure?",
-    onSelectAction: function(session)
-    {
-        console.log("Action Canceled")
-    }
-}).reloadAction("reloadPreferences", "Restarting Preference Gathering", {
-    matches: /^start over/i,
-    onSelectAction: function(session)
-    {
-        session.beginDialog("/preferences");
-    }
+]).reloadAction("reloadPreferences", "Restarting Preference Gathering", {
+    matches: [/^restart/i, /^start over/i]
 })
 
 bot.dialog("/locations", [
@@ -214,6 +214,7 @@ bot.dialog("/locations", [
                 else 
                 {
                     // Call the error dialogue
+                    console.log("There was an error getting your starting location");
                 }
             }
         )
@@ -249,7 +250,8 @@ bot.dialog("/locations", [
                     // get the longitude
                     session.userData.end_long = response.json.results[0].geometry.location.lng
 
-                    next();
+                    
+                    session.beginDialog("/calculation");
 
                 }
 
@@ -258,14 +260,14 @@ bot.dialog("/locations", [
                 {
                     // call the error dialogue
                     // Unable to determine location
-                    console.log();
+                    console.log("There was an error in getting destination");
                 }
             }
         )
-
-        session.beginDialog("/calculation");
     }
-])
+]).reloadAction("reloadLocations", "Getting your location again", {
+    matches: [/^restart/i, /^start over/i]
+})
 
 bot.dialog('/calculation',[
 //=========================================================

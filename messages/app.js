@@ -56,12 +56,28 @@ function LocationAddressFomater(address) {
     return formattedAddress;
 }
 //=========================================================
+// Trigger Dialogs
+//=========================================================
+bot.dialog("/cancel", [
+    function (session) {
+        session.endConversation("Thank you for using Travelr!");
+    }
+]).triggerAction({
+    confirmPrompt: "Are you sure you want to cancel?",
+    matches: /^cancel/i
+});
+bot.dialog("/recalculate", [
+    function (session) {
+        session.replaceDialog("/calculate");
+    }
+]).triggerAction({ confirmPrompt: "Are you sure you want to rerun?", matches: [/^rerun/i, /^recalculate/i] });
+//=========================================================
 // Bots Dialogs
 //=========================================================
 bot.dialog('/', [
     // send the intro
     function (session, args, next) {
-        session.send("Hello and welcome to Travelr! We just need a few details to get you to your destination!");
+        session.send("Hello and welcome to Travelr! We just need a few details to get you to your destination! You can say cancel or restart to redo your current step.");
         session.replaceDialog("/preferences");
     }
 ]);
@@ -106,10 +122,7 @@ bot.dialog('/preferences', [
         session.replaceDialog('/locations');
     }
 ]).reloadAction("reloadPreferences", "Restarting Preference Gathering", {
-    matches: /^start over/i,
-    onSelectAction: function (session) {
-        session.beginDialog("/references");
-    }
+    matches: [/^restart/i, /^start over/i]
 });
 bot.dialog("/locations", [
     // get the user's starting location
@@ -136,6 +149,7 @@ bot.dialog("/locations", [
             }
             else {
                 // Call the error dialogue
+                console.log("There was an error getting your starting location");
             }
         });
     },
@@ -158,16 +172,18 @@ bot.dialog("/locations", [
                     geometry.location.lat;
                 // get the longitude
                 session.userData.end_long = response.json.results[0].geometry.location.lng;
-                next();
+                session.beginDialog("/calculation");
             }
             else {
                 // call the error dialogue
                 // Unable to determine location
-                console.log();
+                console.log("There was an error in getting destination");
             }
         });
     }
-]);
+]).reloadAction("reloadLocations", "Getting your location again", {
+    matches: [/^restart/i, /^start over/i]
+});
 bot.dialog('/calculation', [
     //=========================================================
     // Map information 
@@ -300,7 +316,7 @@ bot.dialog('/calculation', [
                                         transitDepartureTime: departureDate.getHours() + (departureDate.getMinutes() < 10 ? ":0" : ":") + departureDate.getMinutes(),
                                         transitDistance: leg.distance.text,
                                         transitDuration: leg.duration.text,
-                                        transitSteps: [],
+                                        transitSteps: []
                                     };
                             }
                             else {
@@ -310,7 +326,7 @@ bot.dialog('/calculation', [
                                         transitDepartureTime: leg.departure_time.text,
                                         transitDistance: leg.distance.text,
                                         transitDuration: leg.duration.text,
-                                        transitSteps: [],
+                                        transitSteps: []
                                     };
                             }
                             // There are many steps
@@ -1327,9 +1343,6 @@ bot.dialog("/Info", [
         session.replaceDialog("/");
     },
 ]);
-
-
-
 if (useEmulator) {
     var server_1 = restify.createServer();
     server_1.listen(process.env.port || process.env.PORT || 3978, function () {

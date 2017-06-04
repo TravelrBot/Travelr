@@ -27,9 +27,40 @@ server.post('/api/messages', connector.listen());
 var bot = new builder.UniversalBot(connector);
 
 bot.dialog("/", [
-    function(session: builder.Session)
+    function(session: builder.Session, args, next: any)
     {
         
         session.send(session.message.source);
+        session.beginDialog("/index");
     }
+]).customAction({matches: /^custom/i, onSelectAction: (session, args) => 
+    {
+        session.clearDialogStack();
+        session.beginDialog('/test');
+    }
+})
+
+bot.dialog('/test', [
+    (session) =>
+    {
+        builder.Prompts.confirm(session, "Do you want to restart?");
+    },
+    (session, args: builder.IPromptConfirmResult, next) =>
+    {
+        console.log(args.response);
+    }
+])
+
+bot.dialog("/index", [
+    (session, args, next) =>
+    {
+        session.send("Hello world");
+        next()
+    },
+
+    (session, args, next) =>
+    {
+        builder.Prompts.confirm(session, "Want to continue?");
+    }
+
 ])

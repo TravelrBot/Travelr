@@ -104,6 +104,55 @@ bot.dialog("/recalculate", [
     }
 ]).triggerAction({confirmPrompt:"Are you sure you want to rerun?", matches: [/^rerun/i, /^recalculate/i]})
 
+bot.dialog("/help", [
+
+    (session: builder.Session, args: builder.IActionRouteData, next: any) =>
+    {
+        builder.Prompts.choice(session, "What would you like help with?", ["Company Info", "Commands", "Finished"]);
+    }, 
+
+    (session: builder.Session, results: builder.IPromptChoiceResult, next: any) =>
+    {
+        if (results.response.index == 0)
+        {
+            session.beginDialog('/info');
+            next();
+        }
+        else if (results.response.index == 1)
+        {
+            session.beginDialog('/commands');
+            next();
+        }
+        else
+        {
+            session.endDialog("Leaving the help dialog and returning you to your step!");
+        }
+
+    },
+
+    (session: builder.Session) =>
+    {
+        session.replaceDialog('/help');
+    }
+
+]).triggerAction({
+    matches: /^help$/,
+    confirmPrompt: "Are you sure you want to launch the help dialog?",
+    onSelectAction: (session, args: builder.IActionRouteData, next: any) => 
+    {
+        // Add the help dialog to the dialog stack 
+        // (override the default behavior of replacing the stack)
+        if(args.action)
+        {
+            session.beginDialog(args.action, args);
+        }
+        else
+        {
+            next();
+        }
+    } 
+})
+
 
 //=========================================================
 // Bots Dialogs
@@ -119,13 +168,14 @@ bot.dialog('/', [
 ])
 
 bot.dialog('/preferences', [
-    function (session: builder.Session)
-    {
+    function (session: builder.Session, args, next: any)
+    {   console.log("Getting user preference");
         builder.Prompts.choice(session, "What is your preference on transportation", ["Value", "Time", "luxury"]);
     },
     // Save the perference 
     function (session: builder.Session, result: builder.IPromptChoiceResult, next: any)
     {
+        console.log("Determining result");
         switch (result.response.index) 
         {
             case 0:
@@ -873,36 +923,60 @@ bot.dialog('/calculation',[
 
                     if (perference == 2)
                     {
-                        if (ride.display_name != "Lyft Line") 
+                        if (ride.display_name == "Lyft Premier" || ride.display_name == "Lyft Lux" || ride.display_name == "Lyft Lux SUV") 
                         {
-                            lyftRideTypes.push({
-                                ride_type: ride.ride_type,
-                                display_name: ride.display_name
-                            });
+                            if (group)
+                            {
+                                if (ride.seats > 4)
+                                {
+                                    lyftRideTypes.push({
+                                        ride_type: ride.ride_type,
+                                        display_name: ride.display_name
+                                    });
+
+                                    continue;
+                                }
+                            }
+                            else
+                            {
+                                if (ride.seats < 5)
+                                {
+                                    lyftRideTypes.push({
+                                        ride_type: ride.ride_type,
+                                        display_name: ride.display_name
+                                    });
+
+                                    continue;
+                                }
+                            }
                         }
                     }
 
-                    if (group)
+                    else // if the preference is not luxury
                     {
-                        if (ride.seats > 4)
+                        if (group)
                         {
-                            lyftRideTypes.push({
-                                ride_type: ride.ride_type,
-                                display_name: ride.display_name
-                            });
-                            continue;
-                        }
-                    }
+                            if (ride.seats > 4)
+                            {
+                                lyftRideTypes.push({
+                                    ride_type: ride.ride_type,
+                                    display_name: ride.display_name
+                                });
 
-                    if (!group)
-                    {
-                        if (ride.seats < 5)
+                                continue;
+                            }
+                        }
+                        else
                         {
-                            lyftRideTypes.push({
-                                ride_type: ride.ride_type,
-                                display_name: ride.display_name
-                            });
-                            continue;
+                            if (ride.seats < 5)
+                            {
+                                lyftRideTypes.push({
+                                    ride_type: ride.ride_type,
+                                    display_name: ride.display_name
+                                });
+
+                                continue;
+                            }
                         }
                     }
                 }
@@ -1248,16 +1322,38 @@ bot.dialog('/calculation',[
         // Preference is for luxury
         else if (preference == 2)
         {
-            rideshare = 
+            let uberPrice: number = uber.uber_price;
+            let lyftPrice: number = lyft.price;
+
+            // Find the lower price
+            if (uberPrice < lyftPrice)
+            {   
+                rideshare =
+                {
+                    driverTime: (uber.uber_driver_time / 60).toFixed(2),
+                    price : uberPrice.toFixed(2),
+                    serviceProvider: "Uber",
+                    serviceType : uber.uber_name,
+                    totalDistance : uber.uber_distance.toFixed(2),
+                    totalTime : (uber.uber_travel_time / 60).toFixed(2),
+                    proudctId: uber.uber_productId
+                };
+
+            }
+            else
             {
-                driverTime: (uber.uber_driver_time / 60).toFixed(2),
-                price: uber.uber_price.toFixed(2),
-                serviceProvider: "Uber",
-                serviceType: uber.uber_name,
-                totalDistance: uber.uber_distance.toFixed(2),
-                totalTime: (uber.uber_travel_time / 60).toFixed(2), 
-                proudctId: uber.uber_productId
-            };
+                rideshare =
+                {
+                    driverTime: (lyft.driver_time / 60).toFixed(2),
+                    price : lyft.price.toFixed(2),
+                    serviceProvider: "Lyft",
+                    serviceType : lyft.display_name,
+                    totalDistance : lyft.estimated_distance_miles.toFixed(2),
+                    totalTime : (lyft.estimated_duration_seconds / 60).toFixed(2),
+                    proudctId: lyft.ride_type
+                };
+
+            }
         }
 ////////////////////////////////////////////
 //                                       //
@@ -1774,14 +1870,14 @@ bot.dialog("/options", [
     }
 ]);
 
-bot.dialog("/Info", [
+bot.dialog("/info", [
     function(session: builder.Session): void
     {
         builder.Prompts.choice(session, "What information would you like to see",
-        "Company Info|Privacy|How It Works");
+        "Company Info|Privacy|How It Works|Finished");
     },
 
-    function(session:builder.Session, response:builder.IPromptChoiceResult, next)
+    function(session:builder.Session, response:builder.IPromptChoiceResult, next: any)
     {
         if(response.response.index == 0)
         {
@@ -1819,11 +1915,32 @@ bot.dialog("/Info", [
             Travelr asks the user for their commuting preferences and then it asks the user for their starting and ending locations. After
             typing in their preferences and destination our algorithim internally finds the best choice for the user.`)
         }
+        else
+        {
+            session.send("Returning you back to the help dialog!");
+            session.endDialog();
+        }
 
-        session.replaceDialog("/")
+        console.log("Going to the next step");
+        next();
+
     },
 
+    (session: builder.Session) =>
+    {
+        session.replaceDialog("/info");
+    }
 
+])
+
+bot.dialog('/commands', [
+    (session: builder.Session) =>
+    {
+        session.send("At anytime you can say the following commands: 'cancel', 'restart', 'help'. 'Cancel' stops bot," +
+        "'Restart' restarts the current step, and 'Help' launches the help guide");
+
+        session.endDialog("Returning you to the main help dialog!");
+    }
 ])
 
 if (useEmulator) {

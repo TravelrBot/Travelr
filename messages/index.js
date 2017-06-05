@@ -1,11 +1,11 @@
 "use strict";
 exports.__esModule = true;
-var builder = require("botbuilder");
-var restify = require("restify");
-var request = require("request");
-var googleMaps = require("@google/maps");
-var process = require("process");
-var path = require("path");
+const builder = require("botbuilder");
+const restify = require("restify");
+const request = require("request");
+const googleMaps = require("@google/maps");
+const process = require("process");
+const path = require("path");
 const botbuilder_azure = require("botbuilder-azure");
 
 var googleMapsClient = googleMaps.createClient({
@@ -13,16 +13,13 @@ var googleMapsClient = googleMaps.createClient({
 });
 var useEmulator = (process.env.NODE_ENV == 'development');
 
-let connector = useEmulator ? new builder.ChatConnector() : new botbuilder_azure.BotServiceConnector({
+var connector = useEmulator ? new builder.ChatConnector() : new botbuilder_azure.BotServiceConnector({
     appId: process.env['MicrosoftAppId'],
     appPassword: process.env['MicrosoftAppPassword'],
     stateEndpoint: process.env['BotStateEndpoint'],
     openIdMetadata: process.env['BotOpenIdMetadata']
 });
 
-/*
-var connector = new builder.ChatConnector();
-*/
 var bot = new builder.UniversalBot(connector);
 bot.localePath(path.join(__dirname, './locale'));
 function HtmlParse(html) {

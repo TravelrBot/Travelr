@@ -34,6 +34,7 @@ var HeaderConstants = Constants.HeaderConstants;
  * @property  {string}                      lastModified                          The date/time that the blob was last modified.
  * @property  {string}                      contentLength                         The size of the blob in bytes.
  * @property  {string}                      blobType                              The blob type.
+ * @property  {boolean}                     isIncrementalCopy                     If the blob is incremental copy blob.
  * @property  {string}                      requestId                             The request id.
  * @property  {string}                      sequenceNumber                        The current sequence number for a page blob.
  * @property  {string}                      contentRange                          The content range.
@@ -56,6 +57,7 @@ var HeaderConstants = Constants.HeaderConstants;
  * @property  {string}                      copy.status                           The copy status.
  * @property  {string}                      copy.completionTime                   The copy completion time. 
  * @property  {string}                      copy.statusDescription                The copy status description.
+ * @property  {string}                      copy.destinationSnapshot              The snapshot time of the last successful incremental copy snapshot for this blob.
  * @property  {string}                      copy.progress                         The copy progress.
  * @property  {string}                      copy.source                           The copy source.
  * 
@@ -91,6 +93,11 @@ BlobResult.parse = function (blobXml) {
     }
   }
 
+  // convert isIncrementalCopy to boolean type
+  if (blobResult.isIncrementalCopy !== undefined) {
+    blobResult.isIncrementalCopy = (blobResult.isIncrementalCopy == 'true');
+  }
+
   return blobResult;
 };
 
@@ -111,6 +118,8 @@ var headersForProperties = {
   'getContentMd5': 'RANGE_GET_CONTENT_MD5',
   'acceptRanges': 'ACCEPT_RANGES',
   'appendOffset': 'BLOB_APPEND_OFFSET',
+
+  'isIncrementalCopy': 'INCREMENTAL_COPY',
   
   // ContentSettings
   'contentSettings.contentType': 'CONTENT_TYPE',
@@ -132,7 +141,8 @@ var headersForProperties = {
   'copy.source': 'COPY_SOURCE',
   'copy.progress': 'COPY_PROGRESS',
   'copy.completionTime': 'COPY_COMPLETION_TIME',
-  'copy.statusDescription': 'COPY_STATUS_DESCRIPTION'
+  'copy.statusDescription': 'COPY_STATUS_DESCRIPTION',
+  'copy.destinationSnapshot': 'COPY_DESTINATION_SNAPSHOT'
 };
 
 BlobResult.prototype.getPropertiesFromHeaders = function (headers) {
@@ -150,11 +160,19 @@ BlobResult.prototype.getPropertiesFromHeaders = function (headers) {
     }
   };
 
+  // For range get, 'x-ms-blob-content-md5' indicate the overall MD5 of the blob. Try to set the contentMD5 using this header if it presents
+  setBlobPropertyFromHeaders('contentSettings.contentMD5', HeaderConstants['BLOB_CONTENT_MD5']);
+  
   _.chain(headersForProperties).pairs().each(function (pair) {
     var property = pair[0];
     var header = HeaderConstants[pair[1]];
     setBlobPropertyFromHeaders(property, header);
   });
+
+  // convert isIncrementalCopy to boolean type
+  if (self.isIncrementalCopy !== undefined) {
+    self.isIncrementalCopy = (self.isIncrementalCopy == 'true');
+  }
 };
 
 /**

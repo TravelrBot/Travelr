@@ -7,8 +7,8 @@ function Retrieve()
 
     var query = new azure.TableQuery()
         .select(['RowKey'])
-        .where("RowKey gt '2'")
-        .top(5);
+        .where("RowKey lt '" + Number.MAX_SAFE_INTEGER + "'")
+        .top(2);
     tableService.queryEntities("CustomerInfo", query, null, (error, result, resposne) => 
     {
         if (error)
@@ -17,6 +17,7 @@ function Retrieve()
         }
         else
         {
+            result.entries.reverse();
             for (var i = 0; i < result.entries.length; i++)
             {
                 console.log(result.entries[i].RowKey._)

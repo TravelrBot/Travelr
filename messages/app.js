@@ -1,23 +1,28 @@
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-const builder = require("botbuilder");
+exports.__esModule = true;
+var builder = require("botbuilder");
+var restify = require("restify");
+var request = require("request");
+var googleMaps = require("@google/maps");
+var process = require("process");
+var path = require("path");
 const botbuilder_azure = require("botbuilder-azure");
-const restify = require("restify");
-const request = require("request");
-const googleMaps = require("@google/maps");
-const process = require('process');
-const path = require('path');
 
 var googleMapsClient = googleMaps.createClient({
     key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' //process.env.GOOGLE_MAPS_KEY
 });
 var useEmulator = (process.env.NODE_ENV == 'development');
-var connector = useEmulator ? new builder.ChatConnector() : new botbuilder_azure.BotServiceConnector({
+
+let connector = useEmulator ? new builder.ChatConnector() : new botbuilder_azure.BotServiceConnector({
     appId: process.env['MicrosoftAppId'],
     appPassword: process.env['MicrosoftAppPassword'],
     stateEndpoint: process.env['BotStateEndpoint'],
     openIdMetadata: process.env['BotOpenIdMetadata']
 });
+
+/*
+var connector = new builder.ChatConnector();
+*/
 var bot = new builder.UniversalBot(connector);
 bot.localePath(path.join(__dirname, './locale'));
 function HtmlParse(html) {
@@ -37,7 +42,6 @@ function HtmlParse(html) {
     return (html_return.replace(/  /g, " ").trim());
 }
 function LocationAddressFomater(address) {
-    'pickup[formatted_address]=DFW%20Airport%2C%20Grapevine%2C%20TX%2C%20United%20States';
     var addressSplit = address.split(" ");
     var formattedAddress = '';
     for (var index = 0; index < addressSplit.length; index++) {
@@ -53,20 +57,73 @@ function LocationAddressFomater(address) {
     return formattedAddress;
 }
 //=========================================================
+// Trigger Dialogs
+//=========================================================
+bot.dialog("/cancel", [
+    function (session) {
+        session.endConversation("Thank you for using Travelr!");
+    }
+]).triggerAction({
+    confirmPrompt: "Are you sure you want to cancel?",
+    matches: /^cancel/i
+});
+bot.dialog("/recalculate", [
+    function (session) {
+        session.replaceDialog("/calculation");
+    }
+]).triggerAction({ confirmPrompt: "Are you sure you want to rerun?", matches: [/^rerun/i, /^recalculate/i] });
+bot.dialog("/help", [
+    function (session, args, next) {
+        builder.Prompts.choice(session, "What would you like help with?", ["Company Info", "Commands", "Finished"]);
+    },
+    function (session, results, next) {
+        if (results.response.index == 0) {
+            session.beginDialog('/info');
+        }
+        else if (results.response.index == 1) {
+            session.beginDialog('/commands');
+        }
+        else {
+            session.endDialog("Leaving the help dialog and returning you to your step!");
+            console.log("Ater end dialog \n\n\n\n\n");
+        }
+        next();
+    },
+    function (session) {
+        session.replaceDialog('/help');
+    }
+]).triggerAction({
+    matches: /^help$/,
+    confirmPrompt: "Are you sure you want to launch the help dialog?",
+    onSelectAction: function (session, args, next) {
+        // Add the help dialog to the dialog stack 
+        // (override the default behavior of replacing the stack)
+        if (args.action) {
+            session.beginDialog(args.action, args);
+        }
+        else {
+            next();
+        }
+    }
+});
+//=========================================================
 // Bots Dialogs
 //=========================================================
 bot.dialog('/', [
     // send the intro
     function (session, args, next) {
-        session.send("Hello and welcome to Travelr! We just need a few details to get you to your destination!");
-        next();
-    },
-    // Get the user's preference
-    function (session) {
-        builder.Prompts.choice(session, "What is your preference on transportation?", "Value|Time|Luxury");
+        session.send("Hello and welcome to Travelr! We just need a few details to get you to your destination! You can say cancel or restart to redo your current step.");
+        session.replaceDialog("/preferences");
+    }
+]);
+bot.dialog('/preferences', [
+    function (session, args, next) {
+        console.log("Getting user preference");
+        builder.Prompts.choice(session, "What is your preference on transportation", ["Value", "Time", "luxury"]);
     },
     // Save the perference 
     function (session, result, next) {
+        console.log("Determining result");
         switch (result.response.index) {
             case 0:
                 session.userData.perference = 0;
@@ -99,8 +156,12 @@ bot.dialog('/', [
                 break;
         }
         // Go to the next step
-        next();
-    },
+        session.replaceDialog('/locations');
+    }
+]).reloadAction("reloadPreferences", "Restarting Preference Gathering", {
+    matches: [/^restart/i, /^start over/i]
+});
+bot.dialog("/locations", [
     // get the user's starting location
     function (session) {
         builder.Prompts.text(session, "What is your starting location?");
@@ -125,6 +186,7 @@ bot.dialog('/', [
             }
             else {
                 // Call the error dialogue
+                console.log("There was an error getting your starting location");
             }
         });
     },
@@ -147,15 +209,19 @@ bot.dialog('/', [
                     geometry.location.lat;
                 // get the longitude
                 session.userData.end_long = response.json.results[0].geometry.location.lng;
-                next();
+                session.beginDialog("/calculation");
             }
             else {
                 // call the error dialogue
                 // Unable to determine location
-                console.log();
+                console.log("There was an error in getting destination");
             }
         });
-    },
+    }
+]).reloadAction("reloadLocations", "Getting your location again", {
+    matches: [/^restart/i, /^start over/i]
+});
+bot.dialog('/calculation', [
     //=========================================================
     // Map information 
     //=========================================================
@@ -231,7 +297,18 @@ bot.dialog('/', [
             if (error) {
                 // Send a message to indicate error 
                 console.log(error);
+                console.log("There was an error in google transit information");
                 session.send("There was an unknown error getting transit info");
+                // create the error code
+                var errorTransit = {
+                    transitArrivalTime: "Error",
+                    transitDepartureTime: "Error",
+                    transitDistance: "Error",
+                    transitDuration: "Error",
+                    transitSteps: []
+                };
+                transitFlag = true;
+                session.userData.Transit = errorTransit;
             }
             else {
                 console.log("No error in transit");
@@ -240,6 +317,16 @@ bot.dialog('/', [
                 if (body.status != "OK") {
                     console.log("No transit in area");
                     session.send("Transit is not available in this area.");
+                    // create the error code
+                    var errorTransit = {
+                        transitArrivalTime: "Error",
+                        transitDepartureTime: "Error",
+                        transitDistance: "Error",
+                        transitDuration: "Error",
+                        transitSteps: []
+                    };
+                    session.userData.Transit = errorTransit;
+                    transitFlag = true;
                 }
                 else {
                     console.log("Transit in area");
@@ -575,29 +662,45 @@ bot.dialog('/', [
                 for (var index = 0; index < body.ride_types.length; index++) {
                     var ride = body.ride_types[index];
                     if (perference == 2) {
-                        if (ride.display_name != "Lyft Line") {
-                            lyftRideTypes.push({
-                                ride_type: ride.ride_type,
-                                display_name: ride.display_name
-                            });
+                        if (ride.display_name == "Lyft Premier" || ride.display_name == "Lyft Lux" || ride.display_name == "Lyft Lux SUV") {
+                            if (group) {
+                                if (ride.seats > 4) {
+                                    lyftRideTypes.push({
+                                        ride_type: ride.ride_type,
+                                        display_name: ride.display_name
+                                    });
+                                    continue;
+                                }
+                            }
+                            else {
+                                if (ride.seats < 5) {
+                                    lyftRideTypes.push({
+                                        ride_type: ride.ride_type,
+                                        display_name: ride.display_name
+                                    });
+                                    continue;
+                                }
+                            }
                         }
                     }
-                    if (group) {
-                        if (ride.seats > 4) {
-                            lyftRideTypes.push({
-                                ride_type: ride.ride_type,
-                                display_name: ride.display_name
-                            });
-                            continue;
+                    else {
+                        if (group) {
+                            if (ride.seats > 4) {
+                                lyftRideTypes.push({
+                                    ride_type: ride.ride_type,
+                                    display_name: ride.display_name
+                                });
+                                continue;
+                            }
                         }
-                    }
-                    if (!group) {
-                        if (ride.seats < 5) {
-                            lyftRideTypes.push({
-                                ride_type: ride.ride_type,
-                                display_name: ride.display_name
-                            });
-                            continue;
+                        else {
+                            if (ride.seats < 5) {
+                                lyftRideTypes.push({
+                                    ride_type: ride.ride_type,
+                                    display_name: ride.display_name
+                                });
+                                continue;
+                            }
                         }
                     }
                 }
@@ -856,28 +959,189 @@ bot.dialog('/', [
             }
         }
         else if (preference == 2) {
-            rideshare =
-                {
-                    driverTime: (uber.uber_driver_time / 60).toFixed(2),
-                    price: uber.uber_price.toFixed(2),
-                    serviceProvider: "Uber",
-                    serviceType: uber.uber_name,
-                    totalDistance: uber.uber_distance.toFixed(2),
-                    totalTime: (uber.uber_travel_time / 60).toFixed(2),
-                    proudctId: uber.uber_productId
-                };
+            var uberPrice = uber.uber_price;
+            var lyftPrice = lyft.price;
+            // Find the lower price
+            if (uberPrice < lyftPrice) {
+                rideshare =
+                    {
+                        driverTime: (uber.uber_driver_time / 60).toFixed(2),
+                        price: uberPrice.toFixed(2),
+                        serviceProvider: "Uber",
+                        serviceType: uber.uber_name,
+                        totalDistance: uber.uber_distance.toFixed(2),
+                        totalTime: (uber.uber_travel_time / 60).toFixed(2),
+                        proudctId: uber.uber_productId
+                    };
+            }
+            else {
+                rideshare =
+                    {
+                        driverTime: (lyft.driver_time / 60).toFixed(2),
+                        price: lyft.price.toFixed(2),
+                        serviceProvider: "Lyft",
+                        serviceType: lyft.display_name,
+                        totalDistance: lyft.estimated_distance_miles.toFixed(2),
+                        totalTime: (lyft.estimated_duration_seconds / 60).toFixed(2),
+                        proudctId: lyft.ride_type
+                    };
+            }
         }
-        // Build out the strings
-        var transitString = "Transit <br/>\n        - Departure Time: " + transitInfo.transitDepartureTime + " <br/>\n        - Arrival Time: " + transitInfo.transitArrivalTime + " <br/>\n        - Distance: " + transitInfo.transitDistance + " miles <br/>\n        - Duration " + transitInfo.transitDuration + " minutes <br/>";
-        // Check to see if there is an error with the ridesharing 
-        var rideshareString;
-        if (rideshare.serviceType == "Error") {
-            rideshareString = "We could not find any rideharing options";
+        ////////////////////////////////////////////
+        //                                       //
+        //          BUILD THE MESSAGES           //   
+        //                                       //
+        ///////////////////////////////////////////
+        if (session.message.source != 'skype') {
+            // Build the transit string 
+            var transitMessage = [];
+            // Check to see if there is an error with the ridesharing 
+            var rideshareMessage = [];
+            if (transitInfo.transitDistance == "Error") {
+                console.log("Building the transit error message");
+                transitMessage =
+                    [
+                        { "type": "TextBlock",
+                            "text": "Transit Not Found",
+                            "size": "medium",
+                            "weight": "bolder"
+                        }
+                    ];
+            }
+            else {
+                console.log("Building the transit message");
+                transitMessage =
+                    [
+                        { "type": "TextBlock",
+                            "text": "Transit",
+                            "size": "medium",
+                            "weight": "bolder"
+                        },
+                        {
+                            "type": "TextBlock",
+                            "text": "- Departure Time: " + transitInfo.transitDepartureTime
+                        },
+                        {
+                            "type": "TextBlock",
+                            "text": "- Arrival Time: " + transitInfo.transitArrivalTime
+                        },
+                        {
+                            "type": "TextBlock",
+                            "text": "- Distance: " + transitInfo.transitDistance + " miles"
+                        },
+                        {
+                            "type": "TextBlock",
+                            "text": "- Duration: " + transitInfo.transitDuration
+                        }
+                    ];
+            }
+            if (rideshare.serviceType == "Error") {
+                console.log("Building the rideshare error message");
+                rideshareMessage =
+                    [
+                        {
+                            "type": "TextBlock",
+                            "text": "Rideshare Not Found",
+                            "size": "medium",
+                            "weight": "bolder"
+                        }
+                    ];
+            }
+            else {
+                console.log("Building the rideshare message");
+                rideshareMessage =
+                    [
+                        { "type": "TextBlock",
+                            "text": "Rideshare",
+                            "size": "medium",
+                            "weight": "bolder"
+                        },
+                        {
+                            "type": "TextBlock",
+                            "text": "- Service: " + rideshare.serviceProvider
+                        },
+                        {
+                            "type": "TextBlock",
+                            "text": "- Ride Type: " + rideshare.serviceType
+                        },
+                        {
+                            "type": "TextBlock",
+                            "text": "- Price: $" + rideshare.price
+                        },
+                        {
+                            "type": "TextBlock",
+                            "text": "- Driver Distance: " + rideshare.driverTime + " minutes away"
+                        },
+                        {
+                            "type": "TextBlock",
+                            "text": "- Total Distance: " + rideshare.totalDistance + " miles"
+                        },
+                        {
+                            "type": "TextBlock",
+                            "text": "- Total Duration: " + rideshare.totalTime + " minutes"
+                        }
+                    ];
+            }
+            // Send the master message
+            console.log("Building the master message");
+            var masterMessage = new builder.Message(session)
+                .addAttachment({
+                contentType: "application/vnd.microsoft.card.adaptive",
+                content: {
+                    type: 'AdaptiveCard',
+                    body: [
+                        {
+                            "type": "Container",
+                            "separation": "default",
+                            "items": [
+                                {
+                                    "type": "TextBlock",
+                                    "text": "Transportation Options",
+                                    "size": "large",
+                                    "weight": "bolder"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "Container",
+                            "separation": "default",
+                            "style": "normal",
+                            "items": transitMessage
+                        },
+                        {
+                            "type": "Container",
+                            "separation": "default",
+                            "items": rideshareMessage
+                        }
+                    ]
+                }
+            });
+            session.send(masterMessage);
         }
         else {
-            rideshareString = "Rideshare <br/>\n        - Service: " + rideshare.serviceProvider + " <br/>\n        - Ride Type: " + rideshare.serviceType + " <br/>\n        - Price: " + rideshare.price + " <br/>\n        - Driver Distance: " + rideshare.driverTime + " minutes away <br/>\n        - Total Distance: " + rideshare.totalDistance + " miles <br/>\n        - Total Duration: " + rideshare.totalTime + " minutes <br/>";
+            // Build the transit string 
+            var transitString = void 0;
+            if (transitInfo.transitDistance == "Error") {
+                console.log("Building skype error string");
+                transitString = 'We could not find transit in this area <br/> <br/>';
+            }
+            else {
+                // Build out the strings
+                console.log("Building transit string");
+                transitString = "Transit <br/>\n                - Departure Time: " + transitInfo.transitDepartureTime + " <br/>\n                - Arrival Time: " + transitInfo.transitArrivalTime + " <br/>\n                - Distance: " + transitInfo.transitDistance + " miles <br/>\n                - Duration " + transitInfo.transitDuration + " minutes <br/>";
+            }
+            // Check to see if there is an error with the ridesharing 
+            var rideshareString = void 0;
+            if (rideshare.serviceType == "Error") {
+                console.log("Building rideshare error string");
+                rideshareString = "We could not find any rideharing options";
+            }
+            else {
+                console.log("Building rideshare string");
+                rideshareString = "Rideshare <br/>\n                - Service: " + rideshare.serviceProvider + " <br/>\n                - Ride Type: " + rideshare.serviceType + " <br/>\n                - Price: " + rideshare.price + " <br/>\n                - Driver Distance: " + rideshare.driverTime + " minutes away <br/>\n                - Total Distance: " + rideshare.totalDistance + " miles <br/>\n                - Total Duration: " + rideshare.totalTime + " minutes <br/>";
+            }
+            session.send(transitString + rideshareString);
         }
-        session.send(transitString + rideshareString);
         // Add the options to the userdata
         session.userData.Rideshare = rideshare;
         session.replaceDialog("/options");
@@ -898,30 +1162,146 @@ bot.dialog("/options", [
         var endLong = session.userData.end_long;
         // User wants to see transit information
         if (response.response.index == 0) {
-            // Array to Hold all direction string 
-            var directions = "";
-            for (var step = 0; step < transit.transitSteps.length; step++) {
-                // Check to see if walking or transit step
-                if (transit.transitSteps[step].stepTransitMode == "WALKING") {
-                    var walkingStep = transit.transitSteps[step];
-                    directions += walkingStep.stepMainInstruction + " <br/> \n        - Distance: " + walkingStep.stepDistance + " <br/>\n        - Duration: " + walkingStep.stepDuration + " <br/>\n        ";
-                    for (var step_1 = 0; step_1 < walkingStep.stepDeatiledInstructions.length; step_1++) {
-                        if (step_1 == walkingStep.stepDeatiledInstructions.length - 1) {
-                            directions += "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction + " <br/>";
+            if (transit.transitArrivalTime == "Error") {
+                session.send("There was an error when looking for transit in your locations.");
+            }
+            else {
+                // Array to Hold all direction string 
+                var stepMessage_1 = [];
+                for (var step = 0; step < transit.transitSteps.length; step++) {
+                    // Check to see if walking or transit step
+                    if (transit.transitSteps[step].stepTransitMode == "WALKING") {
+                        var walkingStep = transit.transitSteps[step];
+                        var instructions = [
+                            {
+                                "type": "TextBlock",
+                                "text": "" + walkingStep.stepMainInstruction,
+                                "size": "medium",
+                                "weight": "bolder",
+                                "wrap": true
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": "- Distance: " + walkingStep.stepDistance,
+                                "wrap": true
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": "- Duration: " + walkingStep.stepDuration,
+                                "wrap": true
+                            }
+                        ];
+                        for (var step_1 = 0; step_1 < walkingStep.stepDeatiledInstructions.length; step_1++) {
+                            if (step_1 == walkingStep.stepDeatiledInstructions.length - 1) {
+                                instructions.push({
+                                    "type": "TextBlock",
+                                    "text": "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction,
+                                    "wrap": true
+                                });
+                            }
+                            else {
+                                instructions.push({
+                                    "type": "TextBlock",
+                                    "text": "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction,
+                                    "wrap": true
+                                });
+                            }
                         }
-                        else {
-                            directions += "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction + " <br/> \n                            ";
-                        }
+                        instructions.forEach(function (step) {
+                            stepMessage_1.push(step);
+                        });
+                    }
+                    else {
+                        var transitStep = transit.transitSteps[step];
+                        var transitMessage = [
+                            {
+                                "type": "TextBlock",
+                                "text": "" + transitStep.stepMainInstruction,
+                                "size": "medium",
+                                "weight": "bolder",
+                                "wrap": true
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": "- Depature Name: " + transitStep.departureStopName,
+                                "wrap": true
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": "- Deapture Time: " + transitStep.departureStopTime,
+                                "wrap": true
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": "- Arrival Name: " + transitStep.arrivalStopName,
+                                "wrap": true
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": "- Arrival Time: " + transitStep.arrivalStopTime,
+                                "wrap": true
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": "- Distance: " + transitStep.stepDistance + " miles",
+                                "wrap": true
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": "- Duration: " + transitStep.stepDuration + " minutes",
+                                "wrap": true
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": "- Number of Stops: " + transitStep.numberOfStop,
+                                "wrap": true
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": "- Vehicle Name: " + transitStep.vehicleName + " ",
+                                "wrap": true
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": "- Vehicle Type: " + transitStep.vehicleType,
+                                "wrap": true
+                            }
+                        ];
+                        transitMessage.forEach(function (step) {
+                            stepMessage_1.push(step);
+                        });
                     }
                 }
-                else {
-                    var transitStep = transit.transitSteps[step];
-                    directions += transitStep.stepMainInstruction + " <br/>\n        - Depature Name: " + transitStep.departureStopName + " <br/>\n        - Deapture Time: " + transitStep.departureStopTime + " <br/>\n        - Arrival Name: " + transitStep.arrivalStopName + " <br/>\n        - Arrival Time: " + transitStep.arrivalStopTime + " <br/>\n        - Distance: " + transitStep.stepDistance + " miles <br/>\n        - Duration: " + transitStep.stepDuration + " minutes <br/>\n        - Number of Stops: " + transitStep.numberOfStop + " <br/>\n        - Vehicle Name: " + transitStep.vehicleName + " <br/>\n        - Vehicle Type: " + transitStep.vehicleType + " <br/>";
-                }
+                // Build the step by step directions
+                var directionMessage = new builder.Message(session)
+                    .addAttachment({
+                    contentType: "application/vnd.microsoft.card.adaptive",
+                    content: {
+                        type: 'AdaptiveCard',
+                        body: [
+                            {
+                                "type": "Container",
+                                "separation": "default",
+                                "items": [
+                                    {
+                                        "type": "TextBlock",
+                                        "text": "Transit Steps",
+                                        "size": "large",
+                                        "weight": "bolder"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "Container",
+                                "items": stepMessage_1
+                            }
+                        ]
+                    }
+                });
+                session.send(directionMessage);
+                // repeat the dialog
+                session.replaceDialog('/options');
             }
-            session.send(directions);
-            // repeat the dialog
-            session.replaceDialog('/options');
         }
         else if (response.response.index == 1) {
             // Check the rideshare service provider
@@ -930,17 +1310,80 @@ bot.dialog("/options", [
                 // Format the addresses
                 var pickup = LocationAddressFomater(session.userData.start);
                 var dropoff = LocationAddressFomater(session.userData.end);
-                // Order the Uber
-                session.send("Or click the link to open the app and order your ride!");
-                var uberString = "'https://m.uber.com/ul/?action=setPickup&client_id=" + uberClientId + "&product_id=" + rideshare.proudctId + "&pickup[formatted_address]=" + pickup + "&pickup[latitude]=" + startLat + "&pickup[longitude]=" + startLong + "&dropoff[formatted_address]=" + dropoff + "&dropoff[latitude]=" + endLat + "&dropoff[longitude]=" + endLong;
-                session.send(uberString);
+                var uberString = "https://m.uber.com/ul/?action=setPickup&client_id=" + uberClientId + "&product_id=" + rideshare.proudctId + "&pickup[formatted_address]=" + pickup + "&pickup[latitude]=" + startLat + "&pickup[longitude]=" + startLong + "&dropoff[formatted_address]=" + dropoff + "&dropoff[latitude]=" + endLat + "&dropoff[longitude]=" + endLong;
+                var uberCard = new builder.Message(session)
+                    .addAttachment({
+                    contentType: "application/vnd.microsoft.card.adaptive",
+                    content: {
+                        type: "AdaptiveCard",
+                        body: [
+                            {
+                                "type": "TextBlock",
+                                "text": "Click the image or link to open the app and order your ride!"
+                            },
+                            {
+                                "type": "Image",
+                                "url": 'https://d1a3f4spazzrp4.cloudfront.net/uber-com/1.2.29/d1a3f4spazzrp4.cloudfront.net/images/apple-touch-icon-144x144-279d763222.png',
+                                "size": "small",
+                                "selectAction": {
+                                    "type": "Action.OpenUrl",
+                                    "title": "Order Uber",
+                                    "url": uberString
+                                }
+                            },
+                            {
+                                "type": "Action.OpenUrl",
+                                "title": "Order an Uber",
+                                "url": uberString
+                            }
+                        ]
+                    }
+                })
+                    .addAttachment(new builder.ThumbnailCard(session)
+                    .title("Order an Uber")
+                    .text("Click to order your Uber in the Uber App!")
+                    .images([builder.CardImage.create(session, 'https://d1a3f4spazzrp4.cloudfront.net/uber-com/1.2.29/d1a3f4spazzrp4.cloudfront.net/images/apple-touch-icon-144x144-279d763222.png')])
+                    .buttons([builder.CardAction.openUrl(session, uberString, "Order an Uber")]));
+                session.send(uberCard);
             }
             else if (rideshare.serviceProvider == 'Lyft') {
                 var clientId = '9LHHn1wknlgs';
                 // Order the Lyft
-                session.send("Or click the link to open the app and order your ride!");
                 var lyftString = "https://lyft.com/ride?id=" + rideshare.proudctId + "&pickup[latitude]=" + startLat + "&pickup[longitude]=" + startLong + "&partner=" + clientId + "&destination[latitude]=" + endLat + "&destination[longitude]=" + endLong;
-                session.send(lyftString);
+                var lyftCard = new builder.Message(session)
+                    .addAttachment({
+                    contentType: "application/vnd.microsoft.card.adaptive",
+                    content: {
+                        type: "AdaptiveCard",
+                        body: [
+                            {
+                                "type": "TextBlock",
+                                "text": "Click the image or link to open the app and order your ride!"
+                            },
+                            {
+                                "type": "Image",
+                                "url": 'https://www.lyft.com/apple-touch-icon-precomposed-152x152.png',
+                                "size": "small",
+                                "selectAction": {
+                                    "type": "Action.OpenUrl",
+                                    "title": "Order Lyft",
+                                    "url": lyftString
+                                }
+                            },
+                            {
+                                "type": "Action.OpenUrl",
+                                "title": "Order an Lyft",
+                                "url": lyftString
+                            }
+                        ]
+                    }
+                })
+                    .addAttachment(new builder.ThumbnailCard(session)
+                    .title("Order your Lyft!")
+                    .text("Click the button to order your Lyft in the Lyft App!")
+                    .images([builder.CardImage.create(session, "https://www.lyft.com/apple-touch-icon-precomposed-152x152.png")])
+                    .buttons([builder.CardAction.openUrl(session, lyftString, "Order Lyft")]));
+                session.send(lyftCard);
             }
             else {
                 session.send("We could not find any ridesharing options here");
@@ -953,6 +1396,38 @@ bot.dialog("/options", [
         }
     }
 ]);
+bot.dialog("/info", [
+    function (session) {
+        builder.Prompts.choice(session, "What information would you like to see", "Company Info|Privacy|How It Works|Finished");
+    },
+    function (session, response, next) {
+        if (response.response.index == 0) {
+            session.send("Company Info\n            \n            Travelr is all about creating a more enjoyable commuting experience.\n            \n            We are your urban travel guide to make your daily commute better we match your preferences and find the best options \n            avialable for you including price, time, group size, and a luxurious option.\n\n            By connecting users to one another we enhance the quality of everyone's dialy commute. This means that every user\n            depending on their choice will be able to find the quickest route, the cheapest ride, or the best luxury deal available.");
+        }
+        else if (response.response.index == 1) {
+            session.send("Privacy\n            \n            Retainment of information\n\n            This bot is currently in beta. We do not ask for nor retain personal information including but not limited to: Name, DOB, Mailing or Biling Address, etc...\n            Although, not yet implemented, Travelr does intend to eventually retain your starting location, destiantion, and the best services our system produces. \n            This information will eventually help us with creating a better and faster bot by allowing us to run analysis on the transportation systems in your geographic area.\n\n            Sale of information\n\n            We will not sell the retained informaiton. The informaiton will be used for our own purposes as stated above. We will update our privacy statements accordingly.");
+        }
+        else if (response.response.index == 2) {
+            session.send("How It Works\n\n            Travelr asks the user for their commuting preferences and then it asks the user for their starting and ending locations. After\n            typing in their preferences and destination our algorithim internally finds the best choice for the user.");
+        }
+        else {
+            session.send("Returning you back to the help dialog!");
+            session.endDialog();
+        }
+        console.log("Going to the next step");
+        next();
+    },
+    function (session) {
+        session.replaceDialog("/info");
+    }
+]);
+bot.dialog('/commands', [
+    function (session) {
+        session.send("At anytime you can say the following commands: 'cancel', 'restart', 'help'. 'Cancel' stops bot," +
+            "'Restart' restarts the current step, and 'Help' launches the help guide");
+        session.endDialog("Returning you to the main help dialog!");
+    }
+]);
 if (useEmulator) {
     var server_1 = restify.createServer();
     server_1.listen(process.env.port || process.env.PORT || 3978, function () {
@@ -961,9 +1436,5 @@ if (useEmulator) {
     server_1.post('/api/messages', connector.listen());
 }
 else {
-    module.exports = { default: connector.listen() };
+    module.exports = { "default": connector.listen() };
 }
-
-
-
-

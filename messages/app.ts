@@ -8,7 +8,7 @@ import {Results} from "./results";
 import {Transit} from "./transit";
 import * as process from "process";
 import * as path from "path";
-//import * as botbuilder_azure from "botbuilder-azure";
+import * as botbuilder_azure from "botbuilder-azure";
 
 let googleMapsClient: any = googleMaps.createClient({
     key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' //process.env.GOOGLE_MAPS_KEY
@@ -16,10 +16,8 @@ let googleMapsClient: any = googleMaps.createClient({
 
 let useEmulator: boolean = (process.env.NODE_ENV == 'development');
 
-useEmulator = true;
 
 
-/*
 let connector: any = useEmulator ? new builder.ChatConnector() : new botbuilder_azure.BotServiceConnector({
     appId: process.env['MicrosoftAppId'],
     appPassword: process.env['MicrosoftAppPassword'],
@@ -27,9 +25,6 @@ let connector: any = useEmulator ? new builder.ChatConnector() : new botbuilder_
     openIdMetadata: process.env['BotOpenIdMetadata']
 });
 
-*/
-
-let connector: builder.ChatConnector = new builder.ChatConnector();
 
 let bot: builder.UniversalBot = new builder.UniversalBot(connector);
 bot.localePath(path.join(__dirname, './locale'));
@@ -1764,7 +1759,7 @@ bot.dialog("/options", [
                 let uberString: string = `https://m.uber.com/ul/?action=setPickup&client_id=${uberClientId}&product_id=${rideshare.proudctId}&pickup[formatted_address]=${pickup}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&dropoff[formatted_address]=${dropoff}&dropoff[latitude]=${endLat}&dropoff[longitude]=${endLong}`;
                 
                 let uberCard: builder.Message = new builder.Message(session)
-                    .addAttachment({
+                    /*.addAttachment({
                         contentType: "application/vnd.microsoft.card.adaptive",
                         content:
                         {
@@ -1793,7 +1788,7 @@ bot.dialog("/options", [
                                 }
                             ]
                         }
-                    })
+                    }) */
                     .addAttachment(
                         new builder.ThumbnailCard(session)
                             .title("Order an Uber")
@@ -1814,7 +1809,7 @@ bot.dialog("/options", [
                 let lyftString: string = `https://lyft.com/ride?id=${rideshare.proudctId}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&partner=${clientId}&destination[latitude]=${endLat}&destination[longitude]=${endLong}`;
 
                 let lyftCard: builder.Message = new builder.Message(session)
-                    .addAttachment({
+                    /*.addAttachment({
                         contentType: "application/vnd.microsoft.card.adaptive",
                         content:
                         {
@@ -1844,7 +1839,7 @@ bot.dialog("/options", [
                                 }
                             ]
                         }
-                    })
+                    }) */
                 .addAttachment(new builder.ThumbnailCard(session)
                     .title("Order your Lyft!")
                     .text("Click the button to order your Lyft in the Lyft App!")

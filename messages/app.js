@@ -6,23 +6,18 @@ var request = require("request");
 var googleMaps = require("@google/maps");
 var process = require("process");
 var path = require("path");
-const botbuilder_azure = require("botbuilder-azure");
-
+var botbuilder_azure = require("botbuilder-azure");
 var googleMapsClient = googleMaps.createClient({
     key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' //process.env.GOOGLE_MAPS_KEY
 });
 var useEmulator = (process.env.NODE_ENV == 'development');
-
-let connector = useEmulator ? new builder.ChatConnector() : new botbuilder_azure.BotServiceConnector({
+useEmulator = true;
+var connector = useEmulator ? new builder.ChatConnector() : new botbuilder_azure.BotServiceConnector({
     appId: process.env['MicrosoftAppId'],
     appPassword: process.env['MicrosoftAppPassword'],
     stateEndpoint: process.env['BotStateEndpoint'],
     openIdMetadata: process.env['BotOpenIdMetadata']
 });
-
-/*
-var connector = new builder.ChatConnector();
-*/
 var bot = new builder.UniversalBot(connector);
 bot.localePath(path.join(__dirname, './locale'));
 function HtmlParse(html) {
@@ -79,15 +74,15 @@ bot.dialog("/help", [
     function (session, results, next) {
         if (results.response.index == 0) {
             session.beginDialog('/info');
+            next();
         }
         else if (results.response.index == 1) {
             session.beginDialog('/commands');
+            next();
         }
         else {
             session.endDialog("Leaving the help dialog and returning you to your step!");
-            console.log("Ater end dialog \n\n\n\n\n");
         }
-        next();
     },
     function (session) {
         session.replaceDialog('/help');
@@ -464,19 +459,30 @@ bot.dialog('/calculation', [
                     var ride = body.products[index];
                     if (perference == 2) {
                         if (ride.display_name == "SELECT" || ride.display_name == "BLACK" || ride.display_name == "SUV") {
-                            rides.push({ display_name: ride.display_name });
+                            if (group) {
+                                if (ride.capacity > 4) {
+                                    rides.push({ display_name: ride.display_name });
+                                }
+                            }
+                            else {
+                                if (ride.capacity < 5) {
+                                    rides.push({ display_name: ride.display_name });
+                                }
+                            }
                         }
                     }
-                    if (group) {
-                        if (ride.capacity > 4) {
-                            rides.push({ display_name: ride.display_name });
-                            continue;
+                    else {
+                        if (group) {
+                            if (ride.capacity > 4) {
+                                rides.push({ display_name: ride.display_name });
+                                continue;
+                            }
                         }
-                    }
-                    if (!group) {
-                        if (ride.capacity < 5) {
-                            rides.push({ display_name: ride.display_name });
-                            continue;
+                        if (!group) {
+                            if (ride.capacity < 5) {
+                                rides.push({ display_name: ride.display_name });
+                                continue;
+                            }
                         }
                     }
                 }
@@ -496,6 +502,7 @@ bot.dialog('/calculation', [
                 // Make the request 
                 request(options, function (error, response, info) {
                     var body = JSON.parse(info);
+                    console.log(body);
                     var product = [];
                     // Set variables to hold the infomration
                     var uber_price = 99999;
@@ -733,6 +740,7 @@ bot.dialog('/calculation', [
                     else {
                         console.log("Have lyft prices");
                         var body_1 = JSON.parse(info);
+                        console.log(body_1);
                         // Lyft prices
                         var lyft_price = 99999;
                         var best_lyft_option_1 = {
@@ -1166,224 +1174,222 @@ bot.dialog("/options", [
                 session.send("There was an error when looking for transit in your locations.");
             }
             else {
-                // Array to Hold all direction string 
-                var stepMessage_1 = [];
-                for (var step = 0; step < transit.transitSteps.length; step++) {
-                    // Check to see if walking or transit step
-                    if (transit.transitSteps[step].stepTransitMode == "WALKING") {
-                        var walkingStep = transit.transitSteps[step];
-                        var instructions = [
-                            {
-                                "type": "TextBlock",
-                                "text": "" + walkingStep.stepMainInstruction,
-                                "size": "medium",
-                                "weight": "bolder",
-                                "wrap": true
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": "- Distance: " + walkingStep.stepDistance,
-                                "wrap": true
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": "- Duration: " + walkingStep.stepDuration,
-                                "wrap": true
-                            }
-                        ];
-                        for (var step_1 = 0; step_1 < walkingStep.stepDeatiledInstructions.length; step_1++) {
-                            if (step_1 == walkingStep.stepDeatiledInstructions.length - 1) {
-                                instructions.push({
+                if (session.message.source != 'skype') {
+                    // Array to Hold all direction string 
+                    var stepMessage_1 = [];
+                    for (var step = 0; step < transit.transitSteps.length; step++) {
+                        // Check to see if walking or transit step
+                        if (transit.transitSteps[step].stepTransitMode == "WALKING") {
+                            var walkingStep = transit.transitSteps[step];
+                            var instructions = [
+                                {
                                     "type": "TextBlock",
-                                    "text": "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction,
+                                    "text": "" + walkingStep.stepMainInstruction,
+                                    "size": "medium",
+                                    "weight": "bolder",
                                     "wrap": true
-                                });
-                            }
-                            else {
-                                instructions.push({
+                                },
+                                {
                                     "type": "TextBlock",
-                                    "text": "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction,
+                                    "text": "- Distance: " + walkingStep.stepDistance,
                                     "wrap": true
-                                });
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": "- Duration: " + walkingStep.stepDuration,
+                                    "wrap": true
+                                }
+                            ];
+                            for (var step_1 = 0; step_1 < walkingStep.stepDeatiledInstructions.length; step_1++) {
+                                if (step_1 == walkingStep.stepDeatiledInstructions.length - 1) {
+                                    instructions.push({
+                                        "type": "TextBlock",
+                                        "text": "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction,
+                                        "wrap": true
+                                    });
+                                }
+                                else {
+                                    instructions.push({
+                                        "type": "TextBlock",
+                                        "text": "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction,
+                                        "wrap": true
+                                    });
+                                }
+                            }
+                            instructions.forEach(function (step) {
+                                stepMessage_1.push(step);
+                            });
+                        }
+                        else {
+                            var transitStep = transit.transitSteps[step];
+                            var transitMessage = [
+                                {
+                                    "type": "TextBlock",
+                                    "text": "" + transitStep.stepMainInstruction,
+                                    "size": "medium",
+                                    "weight": "bolder",
+                                    "wrap": true
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": "- Depature Name: " + transitStep.departureStopName,
+                                    "wrap": true
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": "- Deapture Time: " + transitStep.departureStopTime,
+                                    "wrap": true
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": "- Arrival Name: " + transitStep.arrivalStopName,
+                                    "wrap": true
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": "- Arrival Time: " + transitStep.arrivalStopTime,
+                                    "wrap": true
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": "- Distance: " + transitStep.stepDistance + " miles",
+                                    "wrap": true
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": "- Duration: " + transitStep.stepDuration + " minutes",
+                                    "wrap": true
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": "- Number of Stops: " + transitStep.numberOfStop,
+                                    "wrap": true
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": "- Vehicle Name: " + transitStep.vehicleName + " ",
+                                    "wrap": true
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": "- Vehicle Type: " + transitStep.vehicleType,
+                                    "wrap": true
+                                }
+                            ];
+                            transitMessage.forEach(function (step) {
+                                stepMessage_1.push(step);
+                            });
+                        }
+                    }
+                    // Build the step by step directions
+                    var directionMessage = new builder.Message(session)
+                        .addAttachment({
+                        contentType: "application/vnd.microsoft.card.adaptive",
+                        content: {
+                            type: 'AdaptiveCard',
+                            body: [
+                                {
+                                    "type": "Container",
+                                    "separation": "default",
+                                    "items": [
+                                        {
+                                            "type": "TextBlock",
+                                            "text": "Transit Steps",
+                                            "size": "large",
+                                            "weight": "bolder"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "Container",
+                                    "items": stepMessage_1
+                                }
+                            ]
+                        }
+                    });
+                    session.send(directionMessage);
+                    // repeat the dialog
+                    session.replaceDialog('/options');
+                }
+                else {
+                    // Array to Hold all direction string 
+                    var directions = "";
+                    for (var step = 0; step < transit.transitSteps.length; step++) {
+                        // Check to see if walking or transit step
+                        if (transit.transitSteps[step].stepTransitMode == "WALKING") {
+                            var walkingStep = transit.transitSteps[step];
+                            directions += walkingStep.stepMainInstruction + " <br/> \n                            - Distance: " + walkingStep.stepDistance + " <br/>\n                            - Duration: " + walkingStep.stepDuration + " <br/>\n                            ";
+                            for (var step_2 = 0; step_2 < walkingStep.stepDeatiledInstructions.length; step_2++) {
+                                if (step_2 == walkingStep.stepDeatiledInstructions.length - 1) {
+                                    directions += "- Step " + (step_2 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_2].stepMainInstruction + " <br/>";
+                                }
+                                else {
+                                    directions += "- Step " + (step_2 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_2].stepMainInstruction + " <br/> \n                                    ";
+                                }
                             }
                         }
-                        instructions.forEach(function (step) {
-                            stepMessage_1.push(step);
-                        });
+                        else {
+                            var transitStep = transit.transitSteps[step];
+                            directions += transitStep.stepMainInstruction + " <br/>\n                            - Depature Name: " + transitStep.departureStopName + " <br/>\n                            - Deapture Time: " + transitStep.departureStopTime + " <br/>\n                            - Arrival Name: " + transitStep.arrivalStopName + " <br/>\n                            - Arrival Time: " + transitStep.arrivalStopTime + " <br/>\n                            - Distance: " + transitStep.stepDistance + " miles <br/>\n                            - Duration: " + transitStep.stepDuration + " minutes <br/>\n                            - Number of Stops: " + transitStep.numberOfStop + " <br/>\n                            - Vehicle Name: " + transitStep.vehicleName + " <br/>\n                            - Vehicle Type: " + transitStep.vehicleType + " <br/>";
+                        }
                     }
-                    else {
-                        var transitStep = transit.transitSteps[step];
-                        var transitMessage = [
-                            {
-                                "type": "TextBlock",
-                                "text": "" + transitStep.stepMainInstruction,
-                                "size": "medium",
-                                "weight": "bolder",
-                                "wrap": true
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": "- Depature Name: " + transitStep.departureStopName,
-                                "wrap": true
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": "- Deapture Time: " + transitStep.departureStopTime,
-                                "wrap": true
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": "- Arrival Name: " + transitStep.arrivalStopName,
-                                "wrap": true
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": "- Arrival Time: " + transitStep.arrivalStopTime,
-                                "wrap": true
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": "- Distance: " + transitStep.stepDistance + " miles",
-                                "wrap": true
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": "- Duration: " + transitStep.stepDuration + " minutes",
-                                "wrap": true
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": "- Number of Stops: " + transitStep.numberOfStop,
-                                "wrap": true
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": "- Vehicle Name: " + transitStep.vehicleName + " ",
-                                "wrap": true
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": "- Vehicle Type: " + transitStep.vehicleType,
-                                "wrap": true
-                            }
-                        ];
-                        transitMessage.forEach(function (step) {
-                            stepMessage_1.push(step);
-                        });
-                    }
+                    session.send(directions);
+                    // repeat the dialog
+                    session.replaceDialog('/options');
                 }
-                // Build the step by step directions
-                var directionMessage = new builder.Message(session)
-                    .addAttachment({
-                    contentType: "application/vnd.microsoft.card.adaptive",
-                    content: {
-                        type: 'AdaptiveCard',
-                        body: [
-                            {
-                                "type": "Container",
-                                "separation": "default",
-                                "items": [
-                                    {
-                                        "type": "TextBlock",
-                                        "text": "Transit Steps",
-                                        "size": "large",
-                                        "weight": "bolder"
-                                    }
-                                ]
-                            },
-                            {
-                                "type": "Container",
-                                "items": stepMessage_1
-                            }
-                        ]
-                    }
-                });
-                session.send(directionMessage);
-                // repeat the dialog
-                session.replaceDialog('/options');
             }
         }
         else if (response.response.index == 1) {
             // Check the rideshare service provider
             if (rideshare.serviceProvider == "Uber") {
-                var uberClientId = '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP'; //process.env.UBER_APP_ID
-                // Format the addresses
-                var pickup = LocationAddressFomater(session.userData.start);
-                var dropoff = LocationAddressFomater(session.userData.end);
-                var uberString = "https://m.uber.com/ul/?action=setPickup&client_id=" + uberClientId + "&product_id=" + rideshare.proudctId + "&pickup[formatted_address]=" + pickup + "&pickup[latitude]=" + startLat + "&pickup[longitude]=" + startLong + "&dropoff[formatted_address]=" + dropoff + "&dropoff[latitude]=" + endLat + "&dropoff[longitude]=" + endLong;
-                var uberCard = new builder.Message(session)
-                    .addAttachment({
-                    contentType: "application/vnd.microsoft.card.adaptive",
-                    content: {
-                        type: "AdaptiveCard",
-                        body: [
-                            {
-                                "type": "TextBlock",
-                                "text": "Click the image or link to open the app and order your ride!"
-                            },
-                            {
-                                "type": "Image",
-                                "url": 'https://d1a3f4spazzrp4.cloudfront.net/uber-com/1.2.29/d1a3f4spazzrp4.cloudfront.net/images/apple-touch-icon-144x144-279d763222.png',
-                                "size": "small",
-                                "selectAction": {
-                                    "type": "Action.OpenUrl",
-                                    "title": "Order Uber",
-                                    "url": uberString
-                                }
-                            },
-                            {
-                                "type": "Action.OpenUrl",
-                                "title": "Order an Uber",
-                                "url": uberString
-                            }
-                        ]
-                    }
-                })
-                    .addAttachment(new builder.ThumbnailCard(session)
-                    .title("Order an Uber")
-                    .text("Click to order your Uber in the Uber App!")
-                    .images([builder.CardImage.create(session, 'https://d1a3f4spazzrp4.cloudfront.net/uber-com/1.2.29/d1a3f4spazzrp4.cloudfront.net/images/apple-touch-icon-144x144-279d763222.png')])
-                    .buttons([builder.CardAction.openUrl(session, uberString, "Order an Uber")]));
-                session.send(uberCard);
+                if (session.message.source != 'skype') {
+                    var uberClientId = '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP'; //process.env.UBER_APP_ID
+                    // Format the addresses
+                    var pickup = LocationAddressFomater(session.userData.start);
+                    var dropoff = LocationAddressFomater(session.userData.end);
+                    var uberString = "https://m.uber.com/ul/?action=setPickup&client_id=" + uberClientId + "&product_id=" + rideshare.proudctId + "&pickup[formatted_address]=" + pickup + "&pickup[latitude]=" + startLat + "&pickup[longitude]=" + startLong + "&dropoff[formatted_address]=" + dropoff + "&dropoff[latitude]=" + endLat + "&dropoff[longitude]=" + endLong;
+                    var uberCard = new builder.Message(session)
+                        .addAttachment(new builder.ThumbnailCard(session)
+                        .title("Order an Uber")
+                        .text("Click to order your Uber in the Uber App!")
+                        .images([builder.CardImage.create(session, 'https://d1a3f4spazzrp4.cloudfront.net/uber-com/1.2.29/d1a3f4spazzrp4.cloudfront.net/images/apple-touch-icon-144x144-279d763222.png')])
+                        .buttons([builder.CardAction.openUrl(session, uberString, "Order an Uber")])
+                        .tap(builder.CardAction.openUrl(session, uberString, "Order Uber")));
+                    session.send(uberCard);
+                }
+                else {
+                    var uberClientId = '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP'; //process.env.UBER_APP_ID
+                    // Format the addresses
+                    var pickup = LocationAddressFomater(session.userData.start);
+                    var dropoff = LocationAddressFomater(session.userData.end);
+                    // Order the Uber
+                    session.send("Click the link to open the app and order your ride!");
+                    var uberString = "'https://m.uber.com/ul/?action=setPickup&client_id=" + uberClientId + "&product_id=" + rideshare.proudctId + "&pickup[formatted_address]=" + pickup + "&pickup[latitude]=" + startLat + "&pickup[longitude]=" + startLong + "&dropoff[formatted_address]=" + dropoff + "&dropoff[latitude]=" + endLat + "&dropoff[longitude]=" + endLong;
+                    session.send(uberString);
+                }
             }
             else if (rideshare.serviceProvider == 'Lyft') {
-                var clientId = '9LHHn1wknlgs';
-                // Order the Lyft
-                var lyftString = "https://lyft.com/ride?id=" + rideshare.proudctId + "&pickup[latitude]=" + startLat + "&pickup[longitude]=" + startLong + "&partner=" + clientId + "&destination[latitude]=" + endLat + "&destination[longitude]=" + endLong;
-                var lyftCard = new builder.Message(session)
-                    .addAttachment({
-                    contentType: "application/vnd.microsoft.card.adaptive",
-                    content: {
-                        type: "AdaptiveCard",
-                        body: [
-                            {
-                                "type": "TextBlock",
-                                "text": "Click the image or link to open the app and order your ride!"
-                            },
-                            {
-                                "type": "Image",
-                                "url": 'https://www.lyft.com/apple-touch-icon-precomposed-152x152.png',
-                                "size": "small",
-                                "selectAction": {
-                                    "type": "Action.OpenUrl",
-                                    "title": "Order Lyft",
-                                    "url": lyftString
-                                }
-                            },
-                            {
-                                "type": "Action.OpenUrl",
-                                "title": "Order an Lyft",
-                                "url": lyftString
-                            }
-                        ]
-                    }
-                })
-                    .addAttachment(new builder.ThumbnailCard(session)
-                    .title("Order your Lyft!")
-                    .text("Click the button to order your Lyft in the Lyft App!")
-                    .images([builder.CardImage.create(session, "https://www.lyft.com/apple-touch-icon-precomposed-152x152.png")])
-                    .buttons([builder.CardAction.openUrl(session, lyftString, "Order Lyft")]));
-                session.send(lyftCard);
+                if (session.message.source != 'skype') {
+                    var clientId = '9LHHn1wknlgs';
+                    // Order the Lyft
+                    var lyftString = "https://lyft.com/ride?id=" + rideshare.proudctId + "&pickup[latitude]=" + startLat + "&pickup[longitude]=" + startLong + "&partner=" + clientId + "&destination[latitude]=" + endLat + "&destination[longitude]=" + endLong;
+                    var lyftCard = new builder.Message(session)
+                        .addAttachment(new builder.ThumbnailCard(session)
+                        .title("Order your Lyft!")
+                        .text("Click the button to order your Lyft in the Lyft App!")
+                        .subtitle("If on SMS say 'Order Lyft' to order the ride")
+                        .images([builder.CardImage.create(session, "https://www.lyft.com/apple-touch-icon-precomposed-152x152.png")])
+                        .tap(builder.CardAction.openUrl(session, lyftString, "Order Lyft"))
+                        .buttons([builder.CardAction.openUrl(session, lyftString, "Order Lyft")]));
+                    session.send(lyftCard);
+                }
+                else {
+                    var clientId = '9LHHn1wknlgs';
+                    // Order the Lyft
+                    session.send("Or click the link to open the app and order your ride!");
+                    var lyftString = "https://lyft.com/ride?id=" + rideshare.proudctId + "&pickup[latitude]=" + startLat + "&pickup[longitude]=" + startLong + "&partner=" + clientId + "&destination[latitude]=" + endLat + "&destination[longitude]=" + endLong;
+                    session.send(lyftString);
+                }
             }
             else {
                 session.send("We could not find any ridesharing options here");

@@ -8,7 +8,7 @@ import {Results} from "./results";
 import {Transit} from "./transit";
 import * as process from "process";
 import * as path from "path";
-//import * as botbuilder_azure from "botbuilder-azure";
+import * as botbuilder_azure from "botbuilder-azure";
 
 let googleMapsClient: any = googleMaps.createClient({
     key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' //process.env.GOOGLE_MAPS_KEY
@@ -18,8 +18,6 @@ let useEmulator: boolean = (process.env.NODE_ENV == 'development');
 
 useEmulator = true;
 
-
-/*
 let connector: any = useEmulator ? new builder.ChatConnector() : new botbuilder_azure.BotServiceConnector({
     appId: process.env['MicrosoftAppId'],
     appPassword: process.env['MicrosoftAppPassword'],
@@ -27,9 +25,6 @@ let connector: any = useEmulator ? new builder.ChatConnector() : new botbuilder_
     openIdMetadata: process.env['BotOpenIdMetadata']
 });
 
-*/
-
-let connector: builder.ChatConnector = new builder.ChatConnector();
 
 let bot: builder.UniversalBot = new builder.UniversalBot(connector);
 bot.localePath(path.join(__dirname, './locale'));
@@ -654,28 +649,43 @@ bot.dialog('/calculation',[
                     {
                         if (ride.display_name == "SELECT" || ride.display_name == "BLACK" || ride.display_name == "SUV")
                         {
-                            rides.push({display_name: ride.display_name});
+                            if (group)
+                            {
+                                if (ride.capacity > 4)
+                                {
+                                    rides.push({display_name: ride.display_name});
+                                }
+                            }
+                            else
+                            {
+                                if (ride.capacity < 5)
+                                {
+                                    rides.push({display_name: ride.display_name});
+                                }
+                            }
+                            
                         }
                     }
-
-                    if (group)
+                    else
                     {
-                        if (ride.capacity > 4)
+                        if (group)
                         {
-                            rides.push({display_name: ride.display_name});
-                            continue;
+                            if (ride.capacity > 4)
+                            {
+                                rides.push({display_name: ride.display_name});
+                                continue;
+                            }
                         }
-                    }
 
-                    if (!group)
-                    {
-                        if (ride.capacity < 5)
+                        if (!group)
                         {
-                            rides.push({display_name: ride.display_name});
-                            continue;
+                            if (ride.capacity < 5)
+                            {
+                                rides.push({display_name: ride.display_name});
+                                continue;
+                            }
                         }
                     }
-                    
                 }
 
                 // Send the request for Prices
@@ -697,6 +707,7 @@ bot.dialog('/calculation',[
                 request(options, function(error, response, info: string)
                 {
                     let body: Uber.IUberPrices = JSON.parse(info);
+                    console.log(body);
                     let product: Uber.IUberProductPrices[] = [];
 
                     // Set variables to hold the infomration
@@ -1022,6 +1033,7 @@ bot.dialog('/calculation',[
                         console.log("Have lyft prices");
 
                         let body: Lyft.IAllEstimates = JSON.parse(info);
+                        console.log(body);
 
                         // Lyft prices
                         let lyft_price: number = 99999;
@@ -1581,169 +1593,227 @@ bot.dialog("/options", [
             }
             else
             {
-                // Array to Hold all direction string 
-                let stepMessage: any[] = [];
-
-                for (let step: number = 0; step < transit.transitSteps.length; step++) 
+                if (session.message.source != 'skype')
                 {
-                    // Check to see if walking or transit step
-                    if ( transit.transitSteps[step].stepTransitMode == "WALKING")
+                    // Array to Hold all direction string 
+                    let stepMessage: any[] = [];
+
+                    for (let step: number = 0; step < transit.transitSteps.length; step++) 
                     {
-                        let walkingStep: Transit.IStepWalkingInfo = transit.transitSteps[step] as Transit.IStepWalkingInfo;
-
-                        let instructions = 
-                        [
-                            {
-                                "type": "TextBlock",
-                                "text": `${walkingStep.stepMainInstruction}`,
-                                "size": "medium",
-                                "weight": "bolder",
-                                "wrap": true
-
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": `- Distance: ${walkingStep.stepDistance}`,
-                                "wrap": true
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": `- Duration: ${walkingStep.stepDuration}`,
-                                "wrap": true
-                            }
-                        ]
-
-
-                        for (let step: number = 0; step < walkingStep.stepDeatiledInstructions.length; step++)
+                        // Check to see if walking or transit step
+                        if ( transit.transitSteps[step].stepTransitMode == "WALKING")
                         {
-                            if (step == walkingStep.stepDeatiledInstructions.length - 1)
-                            {
-                                instructions.push(
-                                    {
-                                        "type": "TextBlock",
-                                        "text": `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction}`,
-                                        "wrap": true   
-                                    }
-                                );
-                            }
-                            else
-                            {
-                                instructions.push(
-                                    {
-                                        "type": "TextBlock",
-                                        "text": `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction}` ,
-                                        "wrap": true  
-                                    });
-                            }
-                        }
+                            let walkingStep: Transit.IStepWalkingInfo = transit.transitSteps[step] as Transit.IStepWalkingInfo;
 
-                        instructions.forEach(step => {
-                            stepMessage.push(step);
-                        });
-                    }
-
-                    else
-                    {
-                        let transitStep: Transit.IStepTransitInfo = transit.transitSteps[step] as Transit.IStepTransitInfo;
-                        let transitMessage: any[] = 
-                        [
-                            {
-                                "type": "TextBlock",
-                                "text": `${transitStep.stepMainInstruction}`,
-                                "size": "medium",
-                                "weight": "bolder",
-                                "wrap": true   
-
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": `- Depature Name: ${transitStep.departureStopName}`,
-                                "wrap": true  
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": `- Deapture Time: ${transitStep.departureStopTime}`,
-                                "wrap": true  
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": `- Arrival Name: ${transitStep.arrivalStopName}`,
-                                "wrap": true  
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": `- Arrival Time: ${transitStep.arrivalStopTime}`,
-                                "wrap": true  
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": `- Distance: ${transitStep.stepDistance} miles`,
-                                "wrap": true  
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": `- Duration: ${transitStep.stepDuration} minutes`,
-                                "wrap": true  
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": `- Number of Stops: ${transitStep.numberOfStop}`,
-                                "wrap": true  
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": `- Vehicle Name: ${transitStep.vehicleName} `,
-                                "wrap": true  
-                            },
-                            {
-                                "type": "TextBlock",
-                                "text": `- Vehicle Type: ${transitStep.vehicleType}`,
-                                "wrap": true  
-                            }
-                        ];
-
-                        transitMessage.forEach(step => {
-                            stepMessage.push(step);
-                        })
-
-                    }
-                }
-
-                // Build the step by step directions
-                let directionMessage: builder.Message = new builder.Message(session)
-                    .addAttachment({
-                        contentType: "application/vnd.microsoft.card.adaptive",
-                        content: 
-                        {
-                            type: 'AdaptiveCard',
-                            body: 
+                            let instructions = 
                             [
                                 {
-                                    "type": "Container",
-                                    "separation": "default",
-                                    "items":
-                                    [
-                                        {
-                                            "type": "TextBlock",
-                                            "text": "Transit Steps",
-                                            "size": "large",
-                                            "weight": "bolder"
-                                        }
-                                    ]
+                                    "type": "TextBlock",
+                                    "text": `${walkingStep.stepMainInstruction}`,
+                                    "size": "medium",
+                                    "weight": "bolder",
+                                    "wrap": true
+
                                 },
                                 {
-                                    "type": "Container",
-                                    "items": stepMessage
+                                    "type": "TextBlock",
+                                    "text": `- Distance: ${walkingStep.stepDistance}`,
+                                    "wrap": true
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": `- Duration: ${walkingStep.stepDuration}`,
+                                    "wrap": true
                                 }
-                                        
-                            ]   
+                            ]
+
+
+                            for (let step: number = 0; step < walkingStep.stepDeatiledInstructions.length; step++)
+                            {
+                                if (step == walkingStep.stepDeatiledInstructions.length - 1)
+                                {
+                                    instructions.push(
+                                        {
+                                            "type": "TextBlock",
+                                            "text": `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction}`,
+                                            "wrap": true   
+                                        }
+                                    );
+                                }
+                                else
+                                {
+                                    instructions.push(
+                                        {
+                                            "type": "TextBlock",
+                                            "text": `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction}` ,
+                                            "wrap": true  
+                                        });
+                                }
+                            }
+
+                            instructions.forEach(step => {
+                                stepMessage.push(step);
+                            });
                         }
-                    })
 
-                session.send(directionMessage);
+                        else
+                        {
+                            let transitStep: Transit.IStepTransitInfo = transit.transitSteps[step] as Transit.IStepTransitInfo;
+                            let transitMessage: any[] = 
+                            [
+                                {
+                                    "type": "TextBlock",
+                                    "text": `${transitStep.stepMainInstruction}`,
+                                    "size": "medium",
+                                    "weight": "bolder",
+                                    "wrap": true   
 
-                // repeat the dialog
-                session.replaceDialog('/options');
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": `- Depature Name: ${transitStep.departureStopName}`,
+                                    "wrap": true  
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": `- Deapture Time: ${transitStep.departureStopTime}`,
+                                    "wrap": true  
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": `- Arrival Name: ${transitStep.arrivalStopName}`,
+                                    "wrap": true  
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": `- Arrival Time: ${transitStep.arrivalStopTime}`,
+                                    "wrap": true  
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": `- Distance: ${transitStep.stepDistance} miles`,
+                                    "wrap": true  
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": `- Duration: ${transitStep.stepDuration} minutes`,
+                                    "wrap": true  
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": `- Number of Stops: ${transitStep.numberOfStop}`,
+                                    "wrap": true  
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": `- Vehicle Name: ${transitStep.vehicleName} `,
+                                    "wrap": true  
+                                },
+                                {
+                                    "type": "TextBlock",
+                                    "text": `- Vehicle Type: ${transitStep.vehicleType}`,
+                                    "wrap": true  
+                                }
+                            ];
+
+                            transitMessage.forEach(step => {
+                                stepMessage.push(step);
+                            })
+
+                        }
+                    }
+
+                    // Build the step by step directions
+                    let directionMessage: builder.Message = new builder.Message(session)
+                        .addAttachment({
+                            contentType: "application/vnd.microsoft.card.adaptive",
+                            content: 
+                            {
+                                type: 'AdaptiveCard',
+                                body: 
+                                [
+                                    {
+                                        "type": "Container",
+                                        "separation": "default",
+                                        "items":
+                                        [
+                                            {
+                                                "type": "TextBlock",
+                                                "text": "Transit Steps",
+                                                "size": "large",
+                                                "weight": "bolder"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "type": "Container",
+                                        "items": stepMessage
+                                    }
+                                            
+                                ]   
+                            }
+                        })
+
+                    session.send(directionMessage);
+
+                    // repeat the dialog
+                    session.replaceDialog('/options');
+                }
+
+                else // if the user is using skype
+                {
+                    // Array to Hold all direction string 
+                    let directions: string = "";
+
+                    for (let step: number = 0; step < transit.transitSteps.length; step++) 
+                    {
+                        // Check to see if walking or transit step
+                        if ( transit.transitSteps[step].stepTransitMode == "WALKING")
+                        {
+                            let walkingStep: Transit.IStepWalkingInfo = transit.transitSteps[step] as Transit.IStepWalkingInfo;
+
+                            directions += `${walkingStep.stepMainInstruction} <br/> 
+                            - Distance: ${walkingStep.stepDistance} <br/>
+                            - Duration: ${walkingStep.stepDuration} <br/>
+                            `;
+
+                            for (let step: number = 0; step < walkingStep.stepDeatiledInstructions.length; step++)
+                            {
+                                if (step == walkingStep.stepDeatiledInstructions.length - 1)
+                                {
+                                    directions += `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction} <br/>`;
+                                }
+                                else
+                                {
+                                    directions += `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction} <br/> 
+                                    `;
+                                }
+                            }
+                        }
+
+                        else
+                        {
+                            let transitStep: Transit.IStepTransitInfo = transit.transitSteps[step] as Transit.IStepTransitInfo;
+                            
+                            directions += `${transitStep.stepMainInstruction} <br/>
+                            - Depature Name: ${transitStep.departureStopName} <br/>
+                            - Deapture Time: ${transitStep.departureStopTime} <br/>
+                            - Arrival Name: ${transitStep.arrivalStopName} <br/>
+                            - Arrival Time: ${transitStep.arrivalStopTime} <br/>
+                            - Distance: ${transitStep.stepDistance} miles <br/>
+                            - Duration: ${transitStep.stepDuration} minutes <br/>
+                            - Number of Stops: ${transitStep.numberOfStop} <br/>
+                            - Vehicle Name: ${transitStep.vehicleName} <br/>
+                            - Vehicle Type: ${transitStep.vehicleType} <br/>`
+                        }
+                    }
+
+                    session.send(directions);
+
+                    // repeat the dialog
+                    session.replaceDialog('/options');
+                }
+
                 
             }
         }
@@ -1754,113 +1824,147 @@ bot.dialog("/options", [
             // Check the rideshare service provider
             if (rideshare.serviceProvider == "Uber")
             {
-                let uberClientId: string = '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP' //process.env.UBER_APP_ID
+                if (session.message.source != 'skype')
+                {
+                    let uberClientId: string = '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP' //process.env.UBER_APP_ID
 
-                // Format the addresses
-                let pickup: string = LocationAddressFomater(session.userData.start);
-                let dropoff: string = LocationAddressFomater(session.userData.end);
+                    // Format the addresses
+                    let pickup: string = LocationAddressFomater(session.userData.start);
+                    let dropoff: string = LocationAddressFomater(session.userData.end);
 
 
-                let uberString: string = `https://m.uber.com/ul/?action=setPickup&client_id=${uberClientId}&product_id=${rideshare.proudctId}&pickup[formatted_address]=${pickup}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&dropoff[formatted_address]=${dropoff}&dropoff[latitude]=${endLat}&dropoff[longitude]=${endLong}`;
-                
-                let uberCard: builder.Message = new builder.Message(session)
-                    .addAttachment({
-                        contentType: "application/vnd.microsoft.card.adaptive",
-                        content:
-                        {
-                            type: "AdaptiveCard",
-                            body:
-                            [
-                                {
-                                    "type": "TextBlock",
-                                    "text": "Click the image or link to open the app and order your ride!"
-                                },
-                                {
-                                    "type": "Image",
-                                    "url": 'https://d1a3f4spazzrp4.cloudfront.net/uber-com/1.2.29/d1a3f4spazzrp4.cloudfront.net/images/apple-touch-icon-144x144-279d763222.png',
-                                    "size": "small",
-                                    "selectAction": 
+                    let uberString: string = `https://m.uber.com/ul/?action=setPickup&client_id=${uberClientId}&product_id=${rideshare.proudctId}&pickup[formatted_address]=${pickup}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&dropoff[formatted_address]=${dropoff}&dropoff[latitude]=${endLat}&dropoff[longitude]=${endLong}`;
+                    
+                    let uberCard: builder.Message = new builder.Message(session)
+                        /*.addAttachment({
+                            contentType: "application/vnd.microsoft.card.adaptive",
+                            content:
+                            {
+                                type: "AdaptiveCard",
+                                body:
+                                [
+                                    {
+                                        "type": "TextBlock",
+                                        "text": "Click the image or link to open the app and order your ride!"
+                                    },
+                                    {
+                                        "type": "Image",
+                                        "url": 'https://d1a3f4spazzrp4.cloudfront.net/uber-com/1.2.29/d1a3f4spazzrp4.cloudfront.net/images/apple-touch-icon-144x144-279d763222.png',
+                                        "size": "small",
+                                        "selectAction": 
+                                        {
+                                            "type": "Action.OpenUrl",
+                                            "title": "Order Uber",
+                                            "url": uberString
+                                        }
+                                    }, 
                                     {
                                         "type": "Action.OpenUrl",
-                                        "title": "Order Uber",
+                                        "title": "Order an Uber",
                                         "url": uberString
                                     }
-                                }, 
-                                {
-                                    "type": "Action.OpenUrl",
-                                    "title": "Order an Uber",
-                                    "url": uberString
-                                }
-                            ]
-                        }
-                    })
-                    .addAttachment(
-                        new builder.ThumbnailCard(session)
-                            .title("Order an Uber")
-                            .text("Click to order your Uber in the Uber App!")
-                            .images([builder.CardImage.create(session, 'https://d1a3f4spazzrp4.cloudfront.net/uber-com/1.2.29/d1a3f4spazzrp4.cloudfront.net/images/apple-touch-icon-144x144-279d763222.png')])
-                            .buttons([builder.CardAction.openUrl(session, uberString, "Order an Uber")])
-                            )
+                                ]
+                            }
+                        }) */
+                        .addAttachment(
+                            new builder.ThumbnailCard(session)
+                                .title("Order an Uber")
+                                .text("Click to order your Uber in the Uber App!")
+                                .images([builder.CardImage.create(session, 'https://d1a3f4spazzrp4.cloudfront.net/uber-com/1.2.29/d1a3f4spazzrp4.cloudfront.net/images/apple-touch-icon-144x144-279d763222.png')])
+                                .buttons([builder.CardAction.openUrl(session, uberString, "Order an Uber")])
+                                .tap(builder.CardAction.openUrl(session, uberString, "Order Uber"))
+                                )
 
-                session.send(uberCard);
+                    session.send(uberCard);
+                }
+
+                else // if the client is skype
+                {
+                    let uberClientId: string = '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP' //process.env.UBER_APP_ID
+
+                    // Format the addresses
+                    let pickup: string = LocationAddressFomater(session.userData.start);
+                    let dropoff: string = LocationAddressFomater(session.userData.end);
+
+                    // Order the Uber
+                    session.send("Click the link to open the app and order your ride!");
+
+                    let uberString: string = `'https://m.uber.com/ul/?action=setPickup&client_id=${uberClientId}&product_id=${rideshare.proudctId}&pickup[formatted_address]=${pickup}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&dropoff[formatted_address]=${dropoff}&dropoff[latitude]=${endLat}&dropoff[longitude]=${endLong}`;
+                    
+                    session.send(uberString);
+                }
+                    
         }   
 
             else if (rideshare.serviceProvider == 'Lyft')
             {
-                let clientId: string = '9LHHn1wknlgs';
+                if (session.message.source != 'skype')
+                {
+                    let clientId: string = '9LHHn1wknlgs';
 
 
-                // Order the Lyft
-                let lyftString: string = `https://lyft.com/ride?id=${rideshare.proudctId}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&partner=${clientId}&destination[latitude]=${endLat}&destination[longitude]=${endLong}`;
+                    // Order the Lyft
+                    let lyftString: string = `https://lyft.com/ride?id=${rideshare.proudctId}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&partner=${clientId}&destination[latitude]=${endLat}&destination[longitude]=${endLong}`;
 
-                let lyftCard: builder.Message = new builder.Message(session)
-                    .addAttachment({
-                        contentType: "application/vnd.microsoft.card.adaptive",
-                        content:
-                        {
-                            type: "AdaptiveCard",
-                            body:
-                            [
-                                {
-                                    "type": "TextBlock",
-                                    "text": "Click the image or link to open the app and order your ride!"
-                                },
+                    let lyftCard: builder.Message = new builder.Message(session)
+                        /*.addAttachment({
+                            contentType: "application/vnd.microsoft.card.adaptive",
+                            content:
+                            {
+                                type: "AdaptiveCard",
+                                body:
+                                [
+                                    {
+                                        "type": "TextBlock",
+                                        "text": "Click the image or link to open the app and order your ride!"
+                                    },
 
-                                {
-                                    "type": "Image",
-                                    "url": 'https://www.lyft.com/apple-touch-icon-precomposed-152x152.png',
-                                    "size": "small",
-                                    "selectAction": 
+                                    {
+                                        "type": "Image",
+                                        "url": 'https://www.lyft.com/apple-touch-icon-precomposed-152x152.png',
+                                        "size": "small",
+                                        "selectAction": 
+                                        {
+                                            "type": "Action.OpenUrl",
+                                            "title": "Order Lyft",
+                                            "url": lyftString
+                                        }
+                                    }, 
                                     {
                                         "type": "Action.OpenUrl",
-                                        "title": "Order Lyft",
+                                        "title": "Order an Lyft",
                                         "url": lyftString
                                     }
-                                }, 
-                                {
-                                    "type": "Action.OpenUrl",
-                                    "title": "Order an Lyft",
-                                    "url": lyftString
-                                }
-                            ]
-                        }
-                    })
-                .addAttachment(new builder.ThumbnailCard(session)
-                    .title("Order your Lyft!")
-                    .text("Click the button to order your Lyft in the Lyft App!")
-                    .images([builder.CardImage.create(session, "https://www.lyft.com/apple-touch-icon-precomposed-152x152.png")])
-                    .buttons([builder.CardAction.openUrl(session, lyftString, "Order Lyft")]))
+                                ]
+                            }
+                        }) */
+                    .addAttachment(new builder.ThumbnailCard(session)
+                        .title("Order your Lyft!")
+                        .text("Click the button to order your Lyft in the Lyft App!")
+                        .subtitle("If on SMS say 'Order Lyft' to order the ride")
+                        .images([builder.CardImage.create(session, "https://www.lyft.com/apple-touch-icon-precomposed-152x152.png")])
+                        .tap(builder.CardAction.openUrl(session, lyftString, "Order Lyft"))
+                        .buttons([builder.CardAction.openUrl(session, lyftString, "Order Lyft")]));
 
-                session.send(lyftCard)
+                    session.send(lyftCard);
+                }
+                else // The source is skype
+                {
+                     let clientId: string = '9LHHn1wknlgs';
+                    // Order the Lyft
+                    session.send("Or click the link to open the app and order your ride!");
+                    let lyftString: string = `https://lyft.com/ride?id=${rideshare.proudctId}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&partner=${clientId}&destination[latitude]=${endLat}&destination[longitude]=${endLong}`;
+                    session.send(lyftString);
+                }
             }
 
-            else
+            else // If there was on error
             {
                 session.send("We could not find any ridesharing options here");
             }
 
-            // repeat the dialog
-            session.replaceDialog('/options');
+        // repeat the dialog
+        session.replaceDialog('/options');
         }
         // User is done with the conversation
         else

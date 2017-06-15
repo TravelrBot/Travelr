@@ -7,9 +7,17 @@ var googleMaps = require("@google/maps");
 var process = require("process");
 var path = require("path");
 var botbuilder_azure = require("botbuilder-azure");
+var azureStorage = require('azure-storage');
+
+//=========================================================
+// Google Maps Configure
+//=========================================================
 var googleMapsClient = googleMaps.createClient({
     key: 'AIzaSyDdt5T24u8aTQG7H2gOIQBgcbz00qMcJc4' //process.env.GOOGLE_MAPS_KEY
 });
+//=========================================================
+// Connector Configuration
+//=========================================================
 var useEmulator = (process.env.NODE_ENV == 'development');
 useEmulator = true;
 var connector = useEmulator ? new builder.ChatConnector() : new botbuilder_azure.BotServiceConnector({
@@ -18,8 +26,20 @@ var connector = useEmulator ? new builder.ChatConnector() : new botbuilder_azure
     stateEndpoint: process.env['BotStateEndpoint'],
     openIdMetadata: process.env['BotOpenIdMetadata']
 });
-var bot = new builder.UniversalBot(connector);
+//=========================================================
+// Storage Config
+//=========================================================
+var AzureTableClient = new botbuilder_azure.AzureTableClient("BotStorage", "travelrbotc4g2ai", 'cL2Xq/C6MW2ihDet27iU8440FFj1KU0K0TIo1QnYJ3gvyWQ4cn6LysyZInjE0jdeTW75zBTAgTbmkDriNlky0g==');
+var UserTable = new botbuilder_azure.AzureBotStorage({ gzipData: false }, AzureTableClient);
+var tableService = azureStorage.createTableService('DefaultEndpointsProtocol=https;AccountName=travelrbotc4g2ai;AccountKey=cL2Xq/C6MW2ihDet27iU8440FFj1KU0K0TIo1QnYJ3gvyWQ4cn6LysyZInjE0jdeTW75zBTAgTbmkDriNlky0g==;EndpointSuffix=core.windows.net');
+//=========================================================
+// Bot Config
+//=========================================================
+var bot = new builder.UniversalBot(connector).set('storage', UserTable);
 bot.localePath(path.join(__dirname, './locale'));
+//=========================================================
+// Universal Functions
+//=========================================================
 function HtmlParse(html) {
     html += " ";
     var html_array = html.split("");
@@ -60,7 +80,7 @@ bot.dialog("/cancel", [
     }
 ]).triggerAction({
     confirmPrompt: "Are you sure you want to cancel?",
-    matches: /^cancel/i
+    matches: /^cancel/i,
 });
 bot.dialog("/recalculate", [
     function (session) {
@@ -88,7 +108,7 @@ bot.dialog("/help", [
         session.replaceDialog('/help');
     }
 ]).triggerAction({
-    matches: /^help$/,
+    matches: /^help/i,
     confirmPrompt: "Are you sure you want to launch the help dialog?",
     onSelectAction: function (session, args, next) {
         // Add the help dialog to the dialog stack 
@@ -101,13 +121,15 @@ bot.dialog("/help", [
         }
     }
 });
+bot.beginDialogAction("repeatOptions", "/options", {});
+bot.beginDialogAction("endConversation", "/end");
 //=========================================================
 // Bots Dialogs
 //=========================================================
 bot.dialog('/', [
     // send the intro
     function (session, args, next) {
-        session.send("Hello and welcome to Travelr! We just need a few details to get you to your destination! You can say cancel or restart to redo your current step.");
+        session.send("Hello and welcome to Travelr! We just need a few details to get you to your destination! You can say 'cancel' or 'restart' to redo your current step. You can also say 'account', to log in and use preferences.");
         session.replaceDialog("/preferences");
     }
 ]);
@@ -121,33 +143,36 @@ bot.dialog('/preferences', [
         console.log("Determining result");
         switch (result.response.index) {
             case 0:
-                session.userData.perference = 0;
+                session.privateConversationData.perference = 0;
                 break;
             case 1:
-                session.userData.perference = 1;
+                session.privateConversationData.perference = 1;
                 break;
             case 2:
-                session.userData.perference = 2;
+                session.privateConversationData.perference = 2;
             default:
-                session.userData.perference = 0;
+                session.privateConversationData.perference = 0;
                 break;
         }
         next();
     },
     // Ask about seating preferences
     function (session) {
-        builder.Prompts.choice(session, "Do you have more than 4 people?", "Yes|No");
+        builder.Prompts.choice(session, "How many people do you have?", "1-2|3-4|5+");
     },
     function (session, result, next) {
         switch (result.response.index) {
             case 0:
-                session.userData.group = true;
+                session.privateConversationData.group = 0;
                 break;
             case 1:
-                session.userData.group = false;
+                session.privateConversationData.group = 1;
+                break;
+            case 2:
+                session.privateConversationData.group = 2;
                 break;
             default:
-                session.userData.group = true;
+                session.privateConversationData.group = 1;
                 break;
         }
         // Go to the next step
@@ -166,16 +191,16 @@ bot.dialog("/locations", [
     //=========================================================
     // save the result 
     function (session, result, next) {
-        session.userData.start = result.response;
+        session.privateConversationData.start = result.response;
         // call the google maps function to get the coordinates 
         googleMapsClient.geocode({
             address: result.response
         }, function (err, response) {
             if (!err) {
                 // Get and save the latitude
-                session.userData.start_lat = response.json.results[0].geometry.location.lat;
+                session.privateConversationData.start_lat = response.json.results[0].geometry.location.lat;
                 // get the longitude
-                session.userData.start_long = response.json.results[0].geometry.location.lng;
+                session.privateConversationData.start_long = response.json.results[0].geometry.location.lng;
                 // Proceed to the next dialogue 
                 next();
             }
@@ -193,17 +218,17 @@ bot.dialog("/locations", [
     // Save the results 
     function (session, results, next) {
         console.log("Have the users desstination");
-        session.userData.end = results.response;
+        session.privateConversationData.end = results.response;
         // Call the google maps clinent
         googleMapsClient.geocode({
             address: results.response
         }, function (err, response) {
             if (!err) {
                 // get the latitutde
-                session.userData.end_lat = response.json.results[0].
+                session.privateConversationData.end_lat = response.json.results[0].
                     geometry.location.lat;
                 // get the longitude
-                session.userData.end_long = response.json.results[0].geometry.location.lng;
+                session.privateConversationData.end_long = response.json.results[0].geometry.location.lng;
                 session.beginDialog("/calculation");
             }
             else {
@@ -224,24 +249,24 @@ bot.dialog('/calculation', [
     function (session, args, next) {
         session.send("Hold on while we get your results");
         // pull down the lats and long
-        var start_lat = session.userData.start_lat;
-        var end_lat = session.userData.end_lat;
-        var start_long = session.userData.start_long;
-        var end_long = session.userData.end_long;
+        var start_lat = session.privateConversationData.start_lat;
+        var end_lat = session.privateConversationData.end_lat;
+        var start_long = session.privateConversationData.start_long;
+        var end_long = session.privateConversationData.end_long;
         var MainUrl = "https://maps.googleapis.com/maps/api/staticmap?";
         var Key = "&key=AIzaSyDQmIfhoqmGszLRkinJi7mD7SEWt2bQFv8";
         // Set the constants
         var Size = "&size=640x640";
-        var Format = "&format=gif";
+        var Format = "&format=png";
         var MarkerStyleStart = "&markers=color:red|label:A|" + start_lat + "," + start_long;
         var MarkerStyleEnd = "&markers=color:red|label:B|" + end_lat + "," + end_long;
-        var Path = "&path=color:blue|" + session.userData.start_lat + "," + session.userData.start_long + "|" + session.userData.end_lat + "," + session.userData.end_long;
+        var Path = "&path=color:blue|" + session.privateConversationData.start_lat + "," + session.privateConversationData.start_long + "|" + session.privateConversationData.end_lat + "," + session.privateConversationData.end_long;
         var Query = MainUrl + Size + Format + MarkerStyleStart + MarkerStyleEnd + Path + Key;
         session.send("Here is a map of your locations");
         // Build the new message 
         var msg = new builder.Message(session)
             .attachments([{
-                contentType: "image/gif",
+                contentType: "image/png",
                 contentUrl: Query
             }]);
         // Send the message
@@ -258,10 +283,10 @@ bot.dialog('/calculation', [
         console.log("Getting Google Transit informaiton");
         // Set the constants 
         // pull down the lats and long
-        var start_lat = session.userData.start_lat;
-        var end_lat = session.userData.end_lat;
-        var start_long = session.userData.start_long;
-        var end_long = session.userData.end_long;
+        var start_lat = session.privateConversationData.start_lat;
+        var end_lat = session.privateConversationData.end_lat;
+        var start_long = session.privateConversationData.start_long;
+        var end_long = session.privateConversationData.end_long;
         // Flags for finished api pulls
         var transitFlag = false;
         var uberFlag = false;
@@ -303,7 +328,7 @@ bot.dialog('/calculation', [
                     transitSteps: []
                 };
                 transitFlag = true;
-                session.userData.Transit = errorTransit;
+                session.privateConversationData.Transit = errorTransit;
             }
             else {
                 console.log("No error in transit");
@@ -320,7 +345,7 @@ bot.dialog('/calculation', [
                         transitDuration: "Error",
                         transitSteps: []
                     };
-                    session.userData.Transit = errorTransit;
+                    session.privateConversationData.Transit = errorTransit;
                     transitFlag = true;
                 }
                 else {
@@ -348,7 +373,7 @@ bot.dialog('/calculation', [
                                         transitDepartureTime: departureDate.getHours() + (departureDate.getMinutes() < 10 ? ":0" : ":") + departureDate.getMinutes(),
                                         transitDistance: leg.distance.text,
                                         transitDuration: leg.duration.text,
-                                        transitSteps: []
+                                        transitSteps: [],
                                     };
                             }
                             else {
@@ -358,7 +383,7 @@ bot.dialog('/calculation', [
                                         transitDepartureTime: leg.departure_time.text,
                                         transitDistance: leg.distance.text,
                                         transitDuration: leg.duration.text,
-                                        transitSteps: []
+                                        transitSteps: [],
                                     };
                             }
                             // There are many steps
@@ -404,7 +429,7 @@ bot.dialog('/calculation', [
                                 }
                             });
                             // save the transit information
-                            session.userData.Transit = transitLegInfo;
+                            session.privateConversationData.Transit = transitLegInfo;
                             transitFlag = true;
                         });
                     }
@@ -419,8 +444,8 @@ bot.dialog('/calculation', [
         var client_id = '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP'; //process.env.UBER_APP_ID,
         var client_secret = 'vAy-juG54SV15yiv7hsDgVMegvMDPbjbtuayZ48a'; //process.env.UBER_APP_PASSWORD,
         var server_token = 'CSQlbbbn6k0gbYZULEqiLk0cwUy03ZIPkIYxPrOs'; //process.env.UBER_APP_TOKEN,
-        var perference = session.userData.perference;
-        var group = session.userData.group;
+        var perference = session.privateConversationData.perference;
+        var group = session.privateConversationData.group;
         var rides = [];
         // Send the request for products
         // This is where we will check for seat capcaity and or luxury options
@@ -450,7 +475,7 @@ bot.dialog('/calculation', [
                 };
                 uberFlag = true;
                 // Set the User data
-                session.userData.Uber = best_uber_option;
+                session.privateConversationData.Uber = best_uber_option;
             }
             else {
                 var body = JSON.parse(info);
@@ -459,12 +484,14 @@ bot.dialog('/calculation', [
                     var ride = body.products[index];
                     if (perference == 2) {
                         if (ride.display_name == "SELECT" || ride.display_name == "BLACK" || ride.display_name == "SUV") {
-                            if (group) {
+                            if (group == 0) {
+                            }
+                            else if (group == 1) {
                                 if (ride.capacity > 4) {
                                     rides.push({ display_name: ride.display_name });
                                 }
                             }
-                            else {
+                            else if (group == 2) {
                                 if (ride.capacity < 5) {
                                     rides.push({ display_name: ride.display_name });
                                 }
@@ -472,14 +499,18 @@ bot.dialog('/calculation', [
                         }
                     }
                     else {
-                        if (group) {
-                            if (ride.capacity > 4) {
+                        if (group == 0) {
+                            rides.push({ display_name: ride.display_name });
+                            continue;
+                        }
+                        else if (group == 1) {
+                            if (ride.capacity > 2) {
                                 rides.push({ display_name: ride.display_name });
                                 continue;
                             }
                         }
-                        if (!group) {
-                            if (ride.capacity < 5) {
+                        else if (group == 2) {
+                            if (ride.capacity > 4) {
                                 rides.push({ display_name: ride.display_name });
                                 continue;
                             }
@@ -530,7 +561,7 @@ bot.dialog('/calculation', [
                         };
                         uberFlag = true;
                         // Set the User data
-                        session.userData.Uber = best_uber_option_1;
+                        session.privateConversationData.Uber = best_uber_option_1;
                     }
                     else {
                         console.log("Have Uber prices");
@@ -608,13 +639,13 @@ bot.dialog('/calculation', [
                                 };
                                 uberFlag = true;
                                 // Set the User data
-                                session.userData.Uber = best_uber_option_2;
+                                session.privateConversationData.Uber = best_uber_option_2;
                             }
                             else {
                                 console.log("Have driver times");
                                 best_uber_option.uber_driver_time = body.times[0].estimate;
                                 // Set the User data
-                                session.userData.Uber = best_uber_option;
+                                session.privateConversationData.Uber = best_uber_option;
                             }
                             uberFlag = true;
                             console.log("Finished Uber Driver Time");
@@ -661,7 +692,7 @@ bot.dialog('/calculation', [
                 };
                 lyftFlag = true;
                 // Save the info to user data
-                session.userData.Lyft = best_lyft_option;
+                session.privateConversationData.Lyft = best_lyft_option;
             }
             else {
                 console.log("In lyft Ride Types");
@@ -670,8 +701,15 @@ bot.dialog('/calculation', [
                     var ride = body.ride_types[index];
                     if (perference == 2) {
                         if (ride.display_name == "Lyft Premier" || ride.display_name == "Lyft Lux" || ride.display_name == "Lyft Lux SUV") {
-                            if (group) {
-                                if (ride.seats > 4) {
+                            if (group == 0) {
+                                lyftRideTypes.push({
+                                    ride_type: ride.ride_type,
+                                    display_name: ride.display_name
+                                });
+                                continue;
+                            }
+                            else if (group == 1) {
+                                if (ride.seats > 2) {
                                     lyftRideTypes.push({
                                         ride_type: ride.ride_type,
                                         display_name: ride.display_name
@@ -679,8 +717,8 @@ bot.dialog('/calculation', [
                                     continue;
                                 }
                             }
-                            else {
-                                if (ride.seats < 5) {
+                            else if (group == 2) {
+                                if (ride.seats > 4) {
                                     lyftRideTypes.push({
                                         ride_type: ride.ride_type,
                                         display_name: ride.display_name
@@ -691,8 +729,15 @@ bot.dialog('/calculation', [
                         }
                     }
                     else {
-                        if (group) {
-                            if (ride.seats > 4) {
+                        if (group == 0) {
+                            lyftRideTypes.push({
+                                ride_type: ride.ride_type,
+                                display_name: ride.display_name
+                            });
+                            continue;
+                        }
+                        else if (group == 1) {
+                            if (ride.seats > 2) {
                                 lyftRideTypes.push({
                                     ride_type: ride.ride_type,
                                     display_name: ride.display_name
@@ -700,8 +745,8 @@ bot.dialog('/calculation', [
                                 continue;
                             }
                         }
-                        else {
-                            if (ride.seats < 5) {
+                        else if (group == 2) {
+                            if (ride.seats > 4) {
                                 lyftRideTypes.push({
                                     ride_type: ride.ride_type,
                                     display_name: ride.display_name
@@ -735,7 +780,7 @@ bot.dialog('/calculation', [
                         };
                         lyftFlag = true;
                         // Save the info to user data
-                        session.userData.Lyft = best_lyft_option;
+                        session.privateConversationData.Lyft = best_lyft_option;
                     }
                     else {
                         console.log("Have lyft prices");
@@ -818,7 +863,7 @@ bot.dialog('/calculation', [
                                 };
                                 lyftFlag = true;
                                 // Save the info to user data
-                                session.userData.Lyft = best_lyft_option_2;
+                                session.privateConversationData.Lyft = best_lyft_option_2;
                             }
                             else {
                                 // Parse the JSON
@@ -826,7 +871,7 @@ bot.dialog('/calculation', [
                                 // Set the Driver time
                                 best_lyft_option_1.driver_time = body_2.eta_estimates[0].eta_seconds;
                                 // Save the info to user data
-                                session.userData.Lyft = best_lyft_option_1;
+                                session.privateConversationData.Lyft = best_lyft_option_1;
                             }
                             lyftFlag = true;
                             console.log("Finished Lyft Time");
@@ -862,11 +907,11 @@ bot.dialog('/calculation', [
     function (session, response, next) {
         console.log("Matching with user preference");
         // Grab the user preference
-        var preference = session.userData.perference;
+        var preference = session.privateConversationData.perference;
         // Grab the infomation
-        var uber = session.userData.Uber;
-        var lyft = session.userData.Lyft;
-        var transitInfo = session.userData.Transit;
+        var uber = session.privateConversationData.Uber;
+        var lyft = session.privateConversationData.Lyft;
+        var transitInfo = session.privateConversationData.Transit;
         var rideshare = {
             driverTime: "Error",
             price: 'Error',
@@ -1150,8 +1195,8 @@ bot.dialog('/calculation', [
             }
             session.send(transitString + rideshareString);
         }
-        // Add the options to the userdata
-        session.userData.Rideshare = rideshare;
+        // Add the options to the privateConversationData
+        session.privateConversationData.Rideshare = rideshare;
         session.replaceDialog("/options");
     }
 ]);
@@ -1162,12 +1207,12 @@ bot.dialog("/options", [
     },
     function (session, response, next) {
         // Get the transit and rideshare options 
-        var transit = session.userData.Transit;
-        var rideshare = session.userData.Rideshare;
-        var startLat = session.userData.start_lat;
-        var startLong = session.userData.start_long;
-        var endLat = session.userData.end_lat;
-        var endLong = session.userData.end_long;
+        var transit = session.privateConversationData.Transit;
+        var rideshare = session.privateConversationData.Rideshare;
+        var startLat = session.privateConversationData.start_lat;
+        var startLong = session.privateConversationData.start_long;
+        var endLat = session.privateConversationData.end_lat;
+        var endLong = session.privateConversationData.end_long;
         // User wants to see transit information
         if (response.response.index == 0) {
             if (transit.transitArrivalTime == "Error") {
@@ -1345,23 +1390,25 @@ bot.dialog("/options", [
                 if (session.message.source != 'skype') {
                     var uberClientId = '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP'; //process.env.UBER_APP_ID
                     // Format the addresses
-                    var pickup = LocationAddressFomater(session.userData.start);
-                    var dropoff = LocationAddressFomater(session.userData.end);
+                    var pickup = LocationAddressFomater(session.privateConversationData.start);
+                    var dropoff = LocationAddressFomater(session.privateConversationData.end);
                     var uberString = "https://m.uber.com/ul/?action=setPickup&client_id=" + uberClientId + "&product_id=" + rideshare.proudctId + "&pickup[formatted_address]=" + pickup + "&pickup[latitude]=" + startLat + "&pickup[longitude]=" + startLong + "&dropoff[formatted_address]=" + dropoff + "&dropoff[latitude]=" + endLat + "&dropoff[longitude]=" + endLong;
                     var uberCard = new builder.Message(session)
                         .addAttachment(new builder.ThumbnailCard(session)
                         .title("Order an Uber")
                         .text("Click to order your Uber in the Uber App!")
                         .images([builder.CardImage.create(session, 'https://d1a3f4spazzrp4.cloudfront.net/uber-com/1.2.29/d1a3f4spazzrp4.cloudfront.net/images/apple-touch-icon-144x144-279d763222.png')])
-                        .buttons([builder.CardAction.openUrl(session, uberString, "Order an Uber")])
+                        .buttons([builder.CardAction.openUrl(session, uberString, "Order an Uber"),
+                        builder.CardAction.dialogAction(session, "repeatOptions", undefined, "Back to options"),
+                        builder.CardAction.dialogAction(session, "endConversation", undefined, "Finish")])
                         .tap(builder.CardAction.openUrl(session, uberString, "Order Uber")));
                     session.send(uberCard);
                 }
                 else {
                     var uberClientId = '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP'; //process.env.UBER_APP_ID
                     // Format the addresses
-                    var pickup = LocationAddressFomater(session.userData.start);
-                    var dropoff = LocationAddressFomater(session.userData.end);
+                    var pickup = LocationAddressFomater(session.privateConversationData.start);
+                    var dropoff = LocationAddressFomater(session.privateConversationData.end);
                     // Order the Uber
                     session.send("Click the link to open the app and order your ride!");
                     var uberString = "'https://m.uber.com/ul/?action=setPickup&client_id=" + uberClientId + "&product_id=" + rideshare.proudctId + "&pickup[formatted_address]=" + pickup + "&pickup[latitude]=" + startLat + "&pickup[longitude]=" + startLong + "&dropoff[formatted_address]=" + dropoff + "&dropoff[latitude]=" + endLat + "&dropoff[longitude]=" + endLong;
@@ -1380,7 +1427,9 @@ bot.dialog("/options", [
                         .subtitle("If on SMS say 'Order Lyft' to order the ride")
                         .images([builder.CardImage.create(session, "https://www.lyft.com/apple-touch-icon-precomposed-152x152.png")])
                         .tap(builder.CardAction.openUrl(session, lyftString, "Order Lyft"))
-                        .buttons([builder.CardAction.openUrl(session, lyftString, "Order Lyft")]));
+                        .buttons([builder.CardAction.openUrl(session, lyftString, "Order Lyft"),
+                        builder.CardAction.dialogAction(session, "repeatOptions", undefined, "Back to options"),
+                        builder.CardAction.dialogAction(session, "endConversation", undefined, "Finish")]));
                     session.send(lyftCard);
                 }
                 else {
@@ -1394,8 +1443,6 @@ bot.dialog("/options", [
             else {
                 session.send("We could not find any ridesharing options here");
             }
-            // repeat the dialog
-            session.replaceDialog('/options');
         }
         else {
             session.endConversation("Thank you for using Travelr! Have a great day!");
@@ -1434,6 +1481,11 @@ bot.dialog('/commands', [
         session.endDialog("Returning you to the main help dialog!");
     }
 ]);
+bot.dialog("/end", [
+    function (session) {
+        session.endConversation("Thank you for using Travelr! Have a great day!");
+    }
+]);
 if (useEmulator) {
     var server_1 = restify.createServer();
     server_1.listen(process.env.port || process.env.PORT || 3978, function () {
@@ -1442,5 +1494,5 @@ if (useEmulator) {
     server_1.post('/api/messages', connector.listen());
 }
 else {
-    module.exports = { "default": connector.listen() };
+    module.exports = { default: connector.listen() };
 }

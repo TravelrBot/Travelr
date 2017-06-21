@@ -32,6 +32,7 @@ var connector = useEmulator ? new builder.ChatConnector() : new botbuilder_azure
 var AzureTableClient = new botbuilder_azure.AzureTableClient("BotStorage", "travelrbotc4g2ai", 'cL2Xq/C6MW2ihDet27iU8440FFj1KU0K0TIo1QnYJ3gvyWQ4cn6LysyZInjE0jdeTW75zBTAgTbmkDriNlky0g==');
 var UserTable = new botbuilder_azure.AzureBotStorage({ gzipData: false }, AzureTableClient);
 var tableService = azureStorage.createTableService('DefaultEndpointsProtocol=https;AccountName=travelrbotc4g2ai;AccountKey=cL2Xq/C6MW2ihDet27iU8440FFj1KU0K0TIo1QnYJ3gvyWQ4cn6LysyZInjE0jdeTW75zBTAgTbmkDriNlky0g==;EndpointSuffix=core.windows.net');
+var entGen = azureStorage.TableUtilities.entityGenerator;
 //=========================================================
 // Bot Config
 //=========================================================
@@ -121,6 +122,24 @@ bot.dialog("/help", [
         }
     }
 });
+bot.dialog("/accountHome", [
+    function (session) {
+        builder.Prompts.choice(session, "Hello and welcome to your account, please create or log into your account", ["Create New Account", "Log On"]);
+    },
+    function (session, result, next) {
+        if (result.response.index == 0) {
+            // Launch the create a new account dialog
+        }
+        else if (result.response.index == 1) {
+            // Launch the logon dialog
+        }
+    }
+]).triggerAction({
+    matches: /^account/i,
+    confirmPrompt: "Would you like to launch the account dialog?",
+    onSelectAction: function (session, args, next) {
+    }
+});
 bot.beginDialogAction("repeatOptions", "/options", {});
 bot.beginDialogAction("endConversation", "/end");
 //=========================================================
@@ -184,7 +203,7 @@ bot.dialog('/preferences', [
 bot.dialog("/locations", [
     // get the user's starting location
     function (session) {
-        builder.Prompts.text(session, "What is your starting location?");
+        builder.Prompts.text(session, "What is your starting location? (E.g. 22nd and Main Austin Texas or JKF Airport)");
     },
     //=========================================================
     // Google Geolocation
@@ -213,7 +232,7 @@ bot.dialog("/locations", [
     // Get the users's destination lcoation
     function (session) {
         console.log("Asking for destination");
-        builder.Prompts.text(session, "What is your destination?");
+        builder.Prompts.text(session, "What is your destination? (E.g. 1600 Pennsylvania Avenue DC or The Space Needle) ");
     },
     // Save the results 
     function (session, results, next) {
@@ -279,6 +298,8 @@ bot.dialog('/calculation', [
     //=========================================================
     // Get transit
     function (session, ars, next) {
+        var time = Date.now();
+        var now = time.toString();
         // Log step to console
         console.log("Getting Google Transit informaiton");
         // Set the constants 
@@ -532,6 +553,23 @@ bot.dialog('/calculation', [
                 };
                 // Make the request 
                 request(options, function (error, response, info) {
+                    // Send the uber information to the cloud as a string
+                    // Form the entity to be sent 
+                    var UberJson = {
+                        PartitionKey: entGen.String('Uber'),
+                        RowKey: entGen.String(session.message.user + ":" + now),
+                        Rideshare: entGen.String(info)
+                    };
+                    tableService.insertEntity("Rideshare", UberJson, function (error, result, response) {
+                        if (!error) {
+                            console.log("Uber Info added to Table");
+                        }
+                        else {
+                            console.log("There was an error adding the person: \n\n");
+                            console.log(error);
+                        }
+                    });
+                    // Convert the string into JSON
                     var body = JSON.parse(info);
                     console.log(body);
                     var product = [];
@@ -784,6 +822,22 @@ bot.dialog('/calculation', [
                     }
                     else {
                         console.log("Have lyft prices");
+                        // Send the uber information to the cloud as a string
+                        // Form the entity to be sent 
+                        var LyftJson = {
+                            PartitionKey: entGen.String('Lyft'),
+                            RowKey: entGen.String(session.message.user + ":" + now),
+                            Rideshare: entGen.String(info)
+                        };
+                        tableService.insertEntity("Rideshare", LyftJson, function (error, result, response) {
+                            if (!error) {
+                                console.log("Uber Info added to Table");
+                            }
+                            else {
+                                console.log("There was an error adding the person: \n\n");
+                                console.log(error);
+                            }
+                        });
                         var body_1 = JSON.parse(info);
                         console.log(body_1);
                         // Lyft prices

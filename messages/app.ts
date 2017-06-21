@@ -43,6 +43,7 @@ let AzureTableClient = new botbuilder_azure.AzureTableClient("BotStorage", "trav
 let UserTable = new botbuilder_azure.AzureBotStorage({gzipData: false}, AzureTableClient)
 
 let tableService: azureStorage.TableService = azureStorage.createTableService('DefaultEndpointsProtocol=https;AccountName=travelrbotc4g2ai;AccountKey=cL2Xq/C6MW2ihDet27iU8440FFj1KU0K0TIo1QnYJ3gvyWQ4cn6LysyZInjE0jdeTW75zBTAgTbmkDriNlky0g==;EndpointSuffix=core.windows.net');
+let entGen = azureStorage.TableUtilities.entityGenerator;
 //=========================================================
 // Bot Config
 //=========================================================
@@ -288,6 +289,7 @@ bot.dialog("/locations", [
     // save the result 
     function (session: builder.Session, result:builder.IPromptTextResult, next: any): void
     {
+        
         session.privateConversationData.start = result.response;
 
         // call the google maps function to get the coordinates 
@@ -426,6 +428,9 @@ bot.dialog('/calculation',[
     // Get transit
     function(session: builder.Session, ars: any, next: Function)
     {
+        let time = Date.now();
+        let now = time.toString();
+
         // Log step to console
         console.log("Getting Google Transit informaiton")
 
@@ -769,8 +774,35 @@ bot.dialog('/calculation',[
                 // Make the request 
                 request(options, function(error, response, info: string)
                 {
+                    // Send the uber information to the cloud as a string
+                    // Form the entity to be sent 
+                    let UberJson = 
+                    {
+                        PartitionKey: entGen.String('Uber'),
+                        RowKey: entGen.String(session.message.user.id + ":" + now),
+                        Rideshare: entGen.String(info),
+                        Start_Lat: start_lat,
+                        Start_Long: start_long, 
+                        End_Lat: end_lat,
+                        End_Long: end_long
+                    };
+                    tableService.insertEntity("Rideshare", UberJson, (error, result, response) =>
+                    {
+                        if (!error) 
+                        {
+                            console.log("Uber Info added to Table");
+                        }
+                        else 
+                        {
+                            console.log("There was an error adding the person: \n\n");
+                            console.log(error);
+                        }
+                    })
+
+                    // Convert the string into JSON
                     let body: Uber.IUberPrices = JSON.parse(info);
                     console.log(body);
+
                     let product: Uber.IUberProductPrices[] = [];
 
                     // Set variables to hold the infomration
@@ -1112,6 +1144,31 @@ bot.dialog('/calculation',[
                     else
                     {   
                         console.log("Have lyft prices");
+
+                        // Send the uber information to the cloud as a string
+                        // Form the entity to be sent 
+                        let LyftJson = 
+                        {
+                            PartitionKey: entGen.String('Lyft'),
+                            RowKey: entGen.String(session.message.user.id + ":" + now),
+                            Rideshare: entGen.String(info),
+                            Start_Lat: start_lat,
+                            Start_Long: start_long, 
+                            End_Lat: end_lat,
+                            End_Long: end_long
+                        };
+                        tableService.insertEntity("Rideshare", LyftJson, (error, result, response) =>
+                        {
+                            if (!error) 
+                            {
+                                console.log("Uber Info added to Table");
+                            }
+                            else 
+                            {
+                                console.log("There was an error adding the person: \n\n");
+                                console.log(error);
+                            }
+                        })
 
                         let body: Lyft.IAllEstimates = JSON.parse(info);
                         console.log(body);

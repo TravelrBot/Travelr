@@ -5,6 +5,7 @@ const restify = require("restify");
 const process = require("process");
 var server = restify.createServer();
 var azure = require('azure-storage');
+var botbuilder_azure = require("botbuilder-azure");
 
 var server = restify.createServer();
 server.listen(process.env.port || process.env.PORT || 3979, function () {
@@ -15,11 +16,14 @@ var connector = new builder.ChatConnector({
     appPassword: ''
 });
 server.post('/api/messages', connector.listen());
-var bot = new builder.UniversalBot(connector);
 var tableService = azure.createTableService('DefaultEndpointsProtocol=https;AccountName=travelrbotc4g2ai;AccountKey=cL2Xq/C6MW2ihDet27iU8440FFj1KU0K0TIo1QnYJ3gvyWQ4cn6LysyZInjE0jdeTW75zBTAgTbmkDriNlky0g==;EndpointSuffix=core.windows.net');
+var AzureTableClient = new botbuilder_azure.AzureTableClient("BotStorage", "travelrbotc4g2ai", 'cL2Xq/C6MW2ihDet27iU8440FFj1KU0K0TIo1QnYJ3gvyWQ4cn6LysyZInjE0jdeTW75zBTAgTbmkDriNlky0g==');
+var UserTable = new botbuilder_azure.AzureBotStorage({ gzipData: false }, AzureTableClient);
+var bot = new builder.UniversalBot(connector).set('storage', UserTable);
 var entGen = azure.TableUtilities.entityGenerator;
 var time = Date.now();
 var now = time.toString();
+
 function PhoneStrip(phone) {
     var finalPhone = '';
     for (var index = 0; index < phone.length; index++) {
@@ -91,15 +95,15 @@ bot.dialog('/signUp', [
         // build the account
         // Check to see if favorite locations have been added 
         var FavoriteLocations = {};
-        if (session.userData.favoriteLocations != undefined) {
+        if (session.userData.favoriteLocations) {
             var locationsObject = session.userData.favoriteLocations;
             for (var key in locationsObject) {
                 FavoriteLocations[key.toString()] = locationsObject[key.toString()];
             }
         }
-        var VisitedLocations = {
-            now: {}
-        };
+        var VisitedLocations = (_a = {},
+            _a[now] = {},
+            _a);
         var Entity = {
             PartitionKey: entGen.String(session.userData.phone),
             RowKey: entGen.String(session.userData.pin),
@@ -109,7 +113,8 @@ bot.dialog('/signUp', [
         tableService.insertOrReplaceEntity("User", Entity, function (error, result, response) {
             if (!error) {
                 console.log("Person added to Table");
-                session.endDialog("Your account has been updated.");
+                session.userData.favoriteLocations = FavoriteLocations;
+                session.endDialog("Your account has been updated. And you have been signed in!");
             }
             else {
                 console.log("There was an error adding the person: \n\n");
@@ -117,6 +122,7 @@ bot.dialog('/signUp', [
                 console.log(error);
             }
         });
+        var _a;
     }
 ]);
 bot.dialog('/addFavorites', [
@@ -139,12 +145,14 @@ bot.dialog('/addFavorites', [
             // Check to see if the user already has favorites
             var FavoriteLocation = session.userData.favoriteLocations;
             if (!FavoriteLocation) {
+                console.log("There are no favorite locations");
                 var FavoriteLocation_1 = {};
                 FavoriteLocation_1[tempFavoriteLocationName] = tempFavoriteLocationAddress;
                 // Add the location to the favorite
                 session.userData.favoriteLocations = FavoriteLocation_1;
             }
             else {
+                console.log("Add a new favorite location");
                 FavoriteLocation[tempFavoriteLocationName] = tempFavoriteLocationAddress;
                 session.userData.favoriteLocations = FavoriteLocation;
             }
@@ -168,10 +176,23 @@ bot.dialog('/removeFavorites', [
     function (session, results, next) {
         // Add the favorites to the string array
         var favorites = ["Cancel"];
-        for (var key in session.userData.favoriteLocations) {
+        console.log(session.userData.favoriteLocations);
+        var favoriteLocations = session.userData.favoriteLocations;
+        for (var key in favoriteLocations) {
             favorites.push(key);
         }
         builder.Prompts.choice(session, "Which location would you like to remove from favorites?", favorites);
+    },
+    function (session, results, next) {
+        var favoriteLocations = session.userData.favoriteLocations;
+        for (var key in favoriteLocations) {
+            if (key == results.response.entity) {
+                delete favoriteLocations[key];
+            }
+        }
+        // upload the new favorite locations to userData
+        session.userData.favoriteLocations = favoriteLocations;
+        session.endDialog();
     }
 ]);
 bot.dialog('/login', [
@@ -195,13 +216,23 @@ bot.dialog('/login', [
             if (error) {
                 console.log("There was an error getting the user.");
                 console.log(error);
-                builder.Prompts.text(session, "We could not find your account. Would you like to try again?");
+                builder.Prompts.text(session, "There was an unknown error finding your account. Would you like to try again?", ["Yes", "No"]);
             }
             else {
-                console.log("User found!");
-                // Get all of the locations and restore the account
-                session.userData.favoriteLocations = result.entries[0].Favorite_Locations._;
-                session.endDialog("We found your account! You are now logged in. ");
+                console.log("No Error!");
+                // Check to see if the user was found
+                if (result.entries.length == 0) {
+                    builder.Prompts.choice(session, "We could not find your account. Would you like to try again?", ["Yes", "No"]);
+                }
+                else
+                {
+                    // Get all of the locations and restore the account
+                    console.log(result.entries[0].Favorite_Locations._);
+                    session.userData.favoriteLocations = JSON.parse(result.entries[0].Favorite_Locations._);
+                    session.userData.phone = session.dialogData.phone;
+                    session.userData.pin = session.dialogData.pin;
+                    session.endDialog("We found your account! You are now logged in. ");
+                }
             }
         });
     },
@@ -215,34 +246,19 @@ bot.dialog('/login', [
     }
 ]);
 bot.dialog('/edit', [
-    function (session) {
-        builder.Prompts.text(session, "Welcome to the 'Account Edit Dialog', what is your Phone Number?");
-    },
-    function (session, results, next) {
-        if (results.response) {
-            session.dialogData.phone = PhoneStrip(results.response);
+    function (session, args, next) {
+        session.send("Welcome to the 'Account Edit Dialog! We need to make sure you are logged in in first!'");
+        // check to see if there is user data
+        // Go to the next step in the waterfall
+        if (session.userData.phone && session.userData.pin) {
+            next();
         }
-        builder.Prompts.text(session, "Great! What is your pin?");
+        else {
+            session.beginDialog("/login");
+        }
     },
     function (session, results, next) {
-        console.log("Getting the user from the table");
-        var query = new azure.TableQuery()
-            .where('PartitionKey eq ?', session.dialogData.phone)
-            .and("RowKey eq ?", results.response);
-        tableService.queryEntities("User", query, null, function (error, result, response) {
-            if (error) {
-                console.log("There was an error getting the user.");
-                console.log(error);
-                session.send("We could not find your account. Please try again or say 'cancel'.");
-                session.replaceDialog('edit');
-            }
-            else {
-                console.log("User found!");
-                // Get all of the locations and restore the account
-                session.dialogData.Favorite_Locations = result.entries[0].Favorite_Locations._;
-                builder.Prompts.choice(session, "We found your account! What would you like to do next?", ['Remove Favorite Locations', "Add Favorite Locations", "Cancel"]);
-            }
-        });
+        builder.Prompts.choice(session, "Awesome, we have your info. What would you like to do next?", ["Remove Favorites", "Add Favorites", "Cancel"]);
     },
     function (session, results, next) {
         if (results.response.index == 0) {
@@ -258,9 +274,9 @@ bot.dialog('/edit', [
     function (session, result, next) {
         // Create the entity 
         var newUser = {
-            PartitionKey: entGen.String(session.dialogData.phone),
-            RowKey: entGen.String(session.dialogData.pin),
-            Favorite_Locations: entGen.String(session.userData.favoriteLocations)
+            PartitionKey: entGen.String(session.userData.phone),
+            RowKey: entGen.String(session.userData.pin),
+            Favorite_Locations: entGen.String(JSON.stringify(session.userData.favoriteLocations))
         };
         // Update the database
         tableService.mergeEntity("User", newUser, function (error, results, response) {
@@ -271,10 +287,9 @@ bot.dialog('/edit', [
             }
             else {
                 console.log(results);
-                session.endDialog("Your account was successfully updated.");
+                session.send("Your account was successfully updated!");
+                session.replaceDialog("/edit");
             }
         });
     }
 ]);
-
-

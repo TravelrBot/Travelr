@@ -36,7 +36,22 @@ var entGen = azureStorage.TableUtilities.entityGenerator;
 //=========================================================
 // Bot Config
 //=========================================================
-var bot = new builder.UniversalBot(connector).set('storage', UserTable);
+var bot = new builder.UniversalBot(connector, [
+    function (session) {
+        builder.Prompts.choice(session, "Hello and welcome to Travelr! What would you like to do?", ["Find Transportation", "Access Account", "Info/Help"]);
+    },
+    function (session, results, next) {
+        if (results.response.index == 0) {
+            session.beginDialog("/main");
+        }
+        else if (results.response.index == 1) {
+            session.beginDialog("/account");
+        }
+        else if (results.response.index == 2) {
+            session.beginDialog("/help");
+        }
+    }
+]).set('storage', UserTable);
 bot.localePath(path.join(__dirname, './locale'));
 //=========================================================
 // Universal Functions
@@ -71,6 +86,18 @@ function LocationAddressFomater(address) {
         }
     }
     return formattedAddress;
+}
+function PhoneStrip(phone) {
+    var finalPhone = '';
+    for (var index = 0; index < phone.length; index++) {
+        if (phone[index] == "-") {
+            continue;
+        }
+        else {
+            finalPhone += phone[index];
+        }
+    }
+    return finalPhone;
 }
 //=========================================================
 // Trigger Dialogs
@@ -122,33 +149,15 @@ bot.dialog("/help", [
         }
     }
 });
-bot.dialog("/accountHome", [
-    function (session) {
-        builder.Prompts.choice(session, "Hello and welcome to your account, please create or log into your account", ["Create New Account", "Log On"]);
-    },
-    function (session, result, next) {
-        if (result.response.index == 0) {
-            // Launch the create a new account dialog
-        }
-        else if (result.response.index == 1) {
-            // Launch the logon dialog
-        }
-    }
-]).triggerAction({
-    matches: /^account/i,
-    confirmPrompt: "Would you like to launch the account dialog?",
-    onSelectAction: function (session, args, next) {
-    }
-});
 bot.beginDialogAction("repeatOptions", "/options", {});
 bot.beginDialogAction("endConversation", "/end");
 //=========================================================
 // Bots Dialogs
 //=========================================================
-bot.dialog('/', [
+bot.dialog('/main', [
     // send the intro
     function (session, args, next) {
-        session.send("Hello and welcome to Travelr! We just need a few details to get you to your destination! You can say 'cancel' or 'restart' to redo your current step. You can also say 'account', to log in and use preferences.");
+        session.send("Great! We just need a few details to get you to your destination! You can say 'cancel' or 'restart' to redo your current step.");
         session.replaceDialog("/preferences");
     }
 ]);
@@ -203,25 +212,52 @@ bot.dialog('/preferences', [
 bot.dialog("/locations", [
     // get the user's starting location
     function (session) {
-        builder.Prompts.text(session, "What is your starting location? (E.g. 22nd and Main Austin Texas or JKF Airport)");
+        var locationChoice = ["Custom"];
+        if (session.userData.phone && session.userData.pin) {
+            var favoriteLocations = session.userData.favoriteLocations;
+            for (var key in favoriteLocations) {
+                locationChoice.push(key);
+            }
+        }
+        builder.Prompts.choice(session, "You can enter a customer address or select one of your favorites", locationChoice);
     },
-    //=========================================================
-    // Google Geolocation
-    //=========================================================
-    // save the result 
-    function (session, result, next) {
-        session.privateConversationData.start = result.response;
-        // call the google maps function to get the coordinates 
-        googleMapsClient.geocode({
-            address: result.response
-        }, function (err, response) {
+    function (session, results, next) {
+        if (results.response.index == 0) {
+            builder.Prompts.text(session, "What is your starting location? (E.g. 22nd and Main Austin Texas or JKF Airport)");
+        }
+        else {
+            // Find the key's pair 
+            var favoriteLocations = session.userData.favoriteLocations;
+            for (var key in favoriteLocations) {
+                if (key == results.response.entity) {
+                    session.privateConversationData.start = favoriteLocations[key];
+                    next();
+                }
+            }
+        }
+    },
+    function (session, results, next) {
+        // Check to see if the information has been recieved
+        if (results.response) {
+            session.privateConversationData.start = results.response;
+        }
+        // set the starting lat and long 
+        // call the google maps function to get the session.privateConversationData 
+        googleMapsClient.geocode({ address: session.privateConversationData.start }, function (err, response) {
             if (!err) {
                 // Get and save the latitude
                 session.privateConversationData.start_lat = response.json.results[0].geometry.location.lat;
                 // get the longitude
                 session.privateConversationData.start_long = response.json.results[0].geometry.location.lng;
-                // Proceed to the next dialogue 
-                next();
+                console.log("Asking for destination");
+                var locationChoice = ["Custom"];
+                if (session.userData.phone && session.userData.pin) {
+                    var favoriteLocations = session.userData.favoriteLocations;
+                    for (var key in favoriteLocations) {
+                        locationChoice.push(key);
+                    }
+                }
+                builder.Prompts.choice(session, "You can enter a customer address or select one of your favorites", locationChoice);
             }
             else {
                 // Call the error dialogue
@@ -229,25 +265,34 @@ bot.dialog("/locations", [
             }
         });
     },
-    // Get the users's destination lcoation
-    function (session) {
-        console.log("Asking for destination");
-        builder.Prompts.text(session, "What is your destination? (E.g. 1600 Pennsylvania Avenue DC or The Space Needle) ");
-    },
-    // Save the results 
     function (session, results, next) {
-        console.log("Have the users desstination");
-        session.privateConversationData.end = results.response;
-        // Call the google maps clinent
-        googleMapsClient.geocode({
-            address: results.response
-        }, function (err, response) {
+        if (results.response.index == 0) {
+            builder.Prompts.text(session, "What is your destination? (E.g. 1600 Pennsylvania Avenue  or The Space Needle)");
+        }
+        else {
+            // Find the key's pair 
+            var favoriteLocations = session.userData.favoriteLocations;
+            for (var key in favoriteLocations) {
+                if (key == results.response.entity) {
+                    session.privateConversationData.end = favoriteLocations[key];
+                    next();
+                }
+            }
+        }
+    },
+    function (session, results, next) {
+        // Check to see if the information has been recieved
+        if (results.response) {
+            session.privateConversationData.end = results.response;
+        }
+        // Get and set the lat and long for the destiation
+        googleMapsClient.geocode({ address: session.privateConversationData.end }, function (err, response) {
             if (!err) {
                 // get the latitutde
-                session.privateConversationData.end_lat = response.json.results[0].
-                    geometry.location.lat;
+                session.privateConversationData.end_lat = response.json.results[0].geometry.location.lat;
                 // get the longitude
                 session.privateConversationData.end_long = response.json.results[0].geometry.location.lng;
+                // Start the next dialog
                 session.beginDialog("/calculation");
             }
             else {
@@ -557,8 +602,12 @@ bot.dialog('/calculation', [
                     // Form the entity to be sent 
                     var UberJson = {
                         PartitionKey: entGen.String('Uber'),
-                        RowKey: entGen.String(session.message.user + ":" + now),
-                        Rideshare: entGen.String(info)
+                        RowKey: entGen.String(session.message.user.id + ":" + now),
+                        Rideshare: entGen.String(info),
+                        Start_Lat: start_lat,
+                        Start_Long: start_long,
+                        End_Lat: end_lat,
+                        End_Long: end_long
                     };
                     tableService.insertEntity("Rideshare", UberJson, function (error, result, response) {
                         if (!error) {
@@ -826,8 +875,12 @@ bot.dialog('/calculation', [
                         // Form the entity to be sent 
                         var LyftJson = {
                             PartitionKey: entGen.String('Lyft'),
-                            RowKey: entGen.String(session.message.user + ":" + now),
-                            Rideshare: entGen.String(info)
+                            RowKey: entGen.String(session.message.user.id + ":" + now),
+                            Rideshare: entGen.String(info),
+                            Start_Lat: start_lat,
+                            Start_Long: start_long,
+                            End_Lat: end_lat,
+                            End_Long: end_long
                         };
                         tableService.insertEntity("Rideshare", LyftJson, function (error, result, response) {
                             if (!error) {
@@ -1526,6 +1579,262 @@ bot.dialog("/info", [
     },
     function (session) {
         session.replaceDialog("/info");
+    }
+]);
+bot.dialog("/account", [
+    function (session, args, next) {
+        console.log("Getting choice");
+        builder.Prompts.choice(session, "Welcome to the account settings! Would you like to 'Sign Up', 'Login', 'Edit', or 'Cancel'?", ['Sign Up', 'Login', 'Edit', 'Cancel']);
+    },
+    function (session, results, next) {
+        console.log("Directing the choice");
+        if (results.response.index == 0) {
+            session.beginDialog('/signUp');
+        }
+        else if (results.response.index == 1) {
+            session.beginDialog('/login');
+        }
+        else if (results.response.index == 2) {
+            session.beginDialog('/edit');
+        }
+        else if (results.response.index == 3) {
+            session.endDialog("Okay returning you to the main menu!");
+        }
+    },
+    function (session, results, next) {
+        if (results.resumed == builder.ResumeReason.completed) {
+            session.replaceDialog('/');
+        }
+    }
+]);
+bot.dialog('/signUp', [
+    function (session, args, next) {
+        console.log("In the sign up dialog");
+        console.log("Getting the users phone number");
+        builder.Prompts.text(session, "Welcome to the sign up dialog! What is your phone number? Your phone number will become your ID.");
+    },
+    function (session, results, next) {
+        console.log("Getting the user's pin");
+        var phone = results.response.trim();
+        var finalPhone = PhoneStrip(phone);
+        session.userData.phone = finalPhone;
+        builder.Prompts.text(session, "Great! Now we just need a custom pin. It can be of any length or combination!");
+    },
+    function (session, results, next) {
+        console.log("Asking for add to favorites");
+        session.userData.pin = results.response;
+        builder.Prompts.choice(session, "Would you like to add your favorite places?", ["Yes", "No"]);
+    },
+    function (session, results, next) {
+        if (results.response.index == 0) {
+            session.send("Awesome, starting the 'Add Favorites' dialog!");
+            console.log("starting the add favorites dialog!");
+            var response = session.beginDialog('/addFavorites');
+        }
+        else {
+            next();
+        }
+    },
+    function (session, args, next) {
+        console.log("Building the user's account");
+        // build the account
+        // Check to see if favorite locations have been added 
+        var FavoriteLocations = {};
+        if (session.userData.favoriteLocations) {
+            var locationsObject = session.userData.favoriteLocations;
+            for (var key in locationsObject) {
+                FavoriteLocations[key.toString()] = locationsObject[key.toString()];
+            }
+        }
+        var VisitedLocations = (_a = {},
+            _a[now] = {},
+            _a);
+        var Entity = {
+            PartitionKey: entGen.String(session.userData.phone),
+            RowKey: entGen.String(session.userData.pin),
+            Favorite_Locations: entGen.String(JSON.stringify(FavoriteLocations)),
+            Visited_Locations: entGen.String(JSON.stringify(VisitedLocations))
+        };
+        tableService.insertOrReplaceEntity("User", Entity, function (error, result, response) {
+            if (!error) {
+                console.log("Person added to Table");
+                session.userData.favoriteLocations = FavoriteLocations;
+                session.endDialog("Your account has been updated. And you have been signed in!");
+            }
+            else {
+                console.log("There was an error adding the person: \n\n");
+                session.endDialog("There was an error updating your account");
+                console.log(error);
+            }
+        });
+        var _a;
+    }
+]);
+bot.dialog('/addFavorites', [
+    function (session, args, next) {
+        builder.Prompts.text(session, "What is the name of your favorite location? E.g. 'Work', or 'Home'");
+    },
+    function (session, results, next) {
+        session.dialogData.tempFavoriteLocationName = results.response;
+        builder.Prompts.text(session, "What is the address for that location? E.g. '2200 Main Street Austin, Texas' or '15 and Broadway New York, New York'");
+    },
+    function (session, results, next) {
+        session.dialogData.tempFavoriteLocationAddress = results.response;
+        builder.Prompts.choice(session, "You said your location name was '" + session.dialogData.tempFavoriteLocationName + " and the address was " + results.response + ". Is that correct?'", ["Yes", "No"]);
+    },
+    function (session, results, next) {
+        if (results.response.index == 0) {
+            // add the information to the array of favorite locations
+            var tempFavoriteLocationName = session.dialogData.tempFavoriteLocationName;
+            var tempFavoriteLocationAddress = session.dialogData.tempFavoriteLocationAddress;
+            // Check to see if the user already has favorites
+            var FavoriteLocation = session.userData.favoriteLocations;
+            if (!FavoriteLocation) {
+                console.log("There are no favorite locations");
+                var FavoriteLocation_1 = {};
+                FavoriteLocation_1[tempFavoriteLocationName] = tempFavoriteLocationAddress;
+                // Add the location to the favorite
+                session.userData.favoriteLocations = FavoriteLocation_1;
+            }
+            else {
+                console.log("Add a new favorite location");
+                FavoriteLocation[tempFavoriteLocationName] = tempFavoriteLocationAddress;
+                session.userData.favoriteLocations = FavoriteLocation;
+            }
+            builder.Prompts.choice(session, "Would you like to add another favorite?", ["Yes", "No"]);
+        }
+        else if (results.response.index == 1) {
+            session.send("Okay we will start over");
+            session.replaceDialog("/addFavorites");
+        }
+    },
+    function (session, results, next) {
+        if (results.response.index == 0) {
+            session.replaceDialog('/addFavorites');
+        }
+        else if (results.response.index == 1) {
+            session.endDialog("Okay, updating your account!");
+        }
+    }
+]);
+bot.dialog('/removeFavorites', [
+    function (session, results, next) {
+        // Add the favorites to the string array
+        var favorites = ["Cancel"];
+        console.log(session.userData.favoriteLocations);
+        var favoriteLocations = session.userData.favoriteLocations;
+        for (var key in favoriteLocations) {
+            favorites.push(key);
+        }
+        builder.Prompts.choice(session, "Which location would you like to remove from favorites?", favorites);
+    },
+    function (session, results, next) {
+        var favoriteLocations = session.userData.favoriteLocations;
+        for (var key in favoriteLocations) {
+            if (key == results.response.entity) {
+                delete favoriteLocations[key];
+            }
+        }
+        // upload the new favorite locations to userData
+        session.userData.favoriteLocations = favoriteLocations;
+        session.endDialog();
+    }
+]);
+bot.dialog('/login', [
+    function (session, results, next) {
+        builder.Prompts.text(session, "Welcome to the 'Login Dialog'. What is your Phone Number?");
+    },
+    function (session, results, next) {
+        if (results.response) {
+            session.dialogData.phone = PhoneStrip(results.response);
+        }
+        ;
+        builder.Prompts.text(session, "What is your pin?");
+    },
+    function (session, results, next) {
+        session.dialogData.pin = results.response;
+        console.log("Getting the user from the table");
+        var query = new azureStorage.TableQuery()
+            .where('PartitionKey eq ?', session.dialogData.phone)
+            .and("RowKey eq ?", session.dialogData.pin);
+        tableService.queryEntities("User", query, null, function (error, result, response) {
+            if (error) {
+                console.log("There was an error getting the user.");
+                console.log(error);
+                builder.Prompts.text(session, "There was an unknown error finding your account. Would you like to try again?", ["Yes", "No"]);
+            }
+            else {
+                console.log("No Error!");
+                // Check to see if the user was found
+                if (result.entries.length == 0) {
+                    builder.Prompts.choice(session, "We could not find your account. Would you like to try again?", ["Yes", "No"]);
+                }
+                else {
+                    // Get all of the locations and restore the account
+                    console.log(result.entries[0].Favorite_Locations._);
+                    session.userData.favoriteLocations = JSON.parse(result.entries[0].Favorite_Locations._);
+                    session.userData.phone = session.dialogData.phone;
+                    session.userData.pin = session.dialogData.pin;
+                    session.endDialog("We found your account! You are now logged in. ");
+                }
+            }
+        });
+    },
+    function (session, results, next) {
+        if (results.response.index == 0) {
+            session.replaceDialog('/login');
+        }
+        else {
+            session.endDialog("Okay I am returning you to the previous dialog.");
+        }
+    }
+]);
+bot.dialog('/edit', [
+    function (session, args, next) {
+        session.send("Welcome to the 'Account Edit Dialog! We need to make sure you are logged in in first!'");
+        // check to see if there is user data
+        // Go to the next step in the waterfall
+        if (session.userData.phone && session.userData.pin) {
+            next();
+        }
+        else {
+            session.beginDialog("/login");
+        }
+    },
+    function (session, results, next) {
+        builder.Prompts.choice(session, "Awesome, we have your info. What would you like to do next?", ["Remove Favorites", "Add Favorites", "Cancel"]);
+    },
+    function (session, results, next) {
+        if (results.response.index == 0) {
+            session.beginDialog('/removeFavorites');
+        }
+        else if (results.response.index == 1) {
+            session.beginDialog('/addFavorites');
+        }
+        else {
+            session.endDialog("Okay returning you to account settings home.");
+        }
+    },
+    function (session, result, next) {
+        // Create the entity 
+        var newUser = {
+            PartitionKey: entGen.String(session.userData.phone),
+            RowKey: entGen.String(session.userData.pin),
+            Favorite_Locations: entGen.String(JSON.stringify(session.userData.favoriteLocations))
+        };
+        // Update the database
+        tableService.mergeEntity("User", newUser, function (error, results, response) {
+            if (error) {
+                console.log(error);
+                session.send("There was an error when updating your acocunt.");
+                session.replaceDialog('/edit');
+            }
+            else {
+                console.log(results);
+                session.send("Your account was successfully updated!");
+                session.replaceDialog("/edit");
+            }
+        });
     }
 ]);
 bot.dialog('/commands', [

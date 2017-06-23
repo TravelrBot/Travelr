@@ -41,7 +41,7 @@ function PhoneStrip(phone: string): string
     return finalPhone;
 }
 
-bot.dialog("/", [
+bot.dialog("/account", [
     (session, args, next) =>
     {
         console.log("Getting choice");
@@ -127,7 +127,7 @@ bot.dialog('/signUp', [
         {
             
         };
-        if (session.userData.favoriteLocations != undefined)
+        if (session.userData.favoriteLocations)
         {
             let locationsObject = session.userData.favoriteLocations
             for (let key in locationsObject)
@@ -138,7 +138,7 @@ bot.dialog('/signUp', [
 
         var VisitedLocations = 
         {
-            now:
+            [now]:
             {
             }
         };
@@ -156,7 +156,8 @@ bot.dialog('/signUp', [
             if (!error) 
             {
                     console.log("Person added to Table");
-                    session.endDialog("Your account has been updated.");
+                    session.userData.favoriteLocations = FavoriteLocations;
+                    session.endDialog("Your account has been updated. And you have been signed in!");
             }
             else 
             {
@@ -243,12 +244,28 @@ bot.dialog('/removeFavorites', [
         // Add the favorites to the string array
         let favorites: string[] = ["Cancel"];
         console.log(session.userData.favoriteLocations);
-        for (let key in session.userData.favoriteLocations)
+        let favoriteLocations: any = session.userData.favoriteLocations
+        for (let key in favoriteLocations)
         {
             favorites.push(key);
         }
 
         builder.Prompts.choice(session, "Which location would you like to remove from favorites?", favorites);
+    },
+    (session: builder.Session, results: builder.IPromptChoiceResult, next: any) =>
+    {
+        let favoriteLocations: any = session.userData.favoriteLocations
+        for (let key in favoriteLocations)
+        {
+            if (key == results.response.entity)
+            {
+                delete favoriteLocations[key]
+            }
+        }
+
+        // upload the new favorite locations to userData
+        session.userData.favoriteLocations = favoriteLocations;
+        session.endDialog();
     }
 ])
 
@@ -281,15 +298,27 @@ bot.dialog('/login', [
             {   
                 console.log("There was an error getting the user.")
                 console.log(error)
-                builder.Prompts.text(session, "We could not find your account. Would you like to try again?")
+                builder.Prompts.text(session, "There was an unknown error finding your account. Would you like to try again?", ["Yes", "No"]);
             }
             else
             {
-                console.log("User found!")
+                console.log("No Error!")
 
-                // Get all of the locations and restore the account
-                session.userData.favoriteLocations = result.entries[0].Favorite_Locations._;
-                session.endDialog("We found your account! You are now logged in. ")
+                // Check to see if the user was found
+                if (result.entries.length == 0)
+                {
+                    builder.Prompts.choice(session, "We could not find your account. Would you like to try again?", ["Yes", "No"]);
+                }
+                else
+                {
+                    // Get all of the locations and restore the account
+                    console.log(result.entries[0].Favorite_Locations._);
+
+                    session.userData.favoriteLocations = JSON.parse(result.entries[0].Favorite_Locations._);
+                    session.userData.phone = session.dialogData.phone;
+                    session.userData.pin = session.dialogData.pin;
+                    session.endDialog("We found your account! You are now logged in. ")
+                }
             }
         })
     },
@@ -309,44 +338,25 @@ bot.dialog('/login', [
 
 bot.dialog('/edit', [
 
-    (session: builder.Session) =>
+    (session: builder.Session, args: any, next: any) =>
     {
-        builder.Prompts.text(session, "Welcome to the 'Account Edit Dialog', what is your Phone Number?");
-    },
-    (session: builder.Session, results: builder.IPromptTextResult, next: any) =>
-    {
-        if (results.response)
-        {
-            session.dialogData.phone = PhoneStrip(results.response);
-        }
-       
-        builder.Prompts.text(session, "Great! What is your pin?");
-    },
-    (session: builder.Session, results: builder.IPromptTextResult, next: any) =>
-    {
-        console.log("Getting the user from the table")
-        let query = new azure.TableQuery()
-            .where('PartitionKey eq ?', session.dialogData.phone)
-            .and("RowKey eq ?", results.response);
-        tableService.queryEntities("User", query, null, function (error, result, response)
-        {
-            if (error)
-            {   
-                console.log("There was an error getting the user.")
-                console.log(error)
-                session.send("We could not find your account. Please try again or say 'cancel'.")
-                session.replaceDialog('edit')
-            }
-            else
-            {
-                console.log("User found!")
+        session.send("Welcome to the 'Account Edit Dialog! We need to make sure you are logged in in first!'")
 
-                // Get all of the locations and restore the account
-                session.dialogData.Favorite_Locations = result.entries[0].Favorite_Locations._;
-                builder.Prompts.choice(session, "We found your account! What would you like to do next?", ['Remove Favorite Locations', "Add Favorite Locations" ,"Cancel"])
-            }
-        })
+        // check to see if there is user data
+        // Go to the next step in the waterfall
+        if (session.userData.phone && session.userData.pin)
+        {
+            next();
+        }
+        else
+        {
+            session.beginDialog("/login")
+        }
     },
+    (session: builder.Session, results: builder.IPromptChoiceResult, next: any) =>
+    {
+        builder.Prompts.choice(session,"Awesome, we have your info. What would you like to do next?", ["Remove Favorites", "Add Favorites", "Cancel"])
+    }
     (session: builder.Session, results: builder.IPromptChoiceResult, next: any) =>
     {
         if (results.response.index == 0) // remove favorites
@@ -367,10 +377,9 @@ bot.dialog('/edit', [
         // Create the entity 
         let newUser = 
         {
-            PartitionKey: entGen.String(session.dialogData.phone),
-            RowKey: entGen.String(session.dialogData.pin),
-            Favorite_Locations: entGen.String(session.userData.favoriteLocations)
-
+            PartitionKey: entGen.String(session.userData.phone),
+            RowKey: entGen.String(session.userData.pin),
+            Favorite_Locations: entGen.String(JSON.stringify(session.userData.favoriteLocations))
         }
         // Update the database
         tableService.mergeEntity("User", newUser, (error,results, response) => 
@@ -384,7 +393,8 @@ bot.dialog('/edit', [
             else
             {
                 console.log(results);
-                session.endDialog("Your account was successfully updated.");
+                session.send("Your account was successfully updated!");
+                session.replaceDialog("/edit")
             }
         })
     }

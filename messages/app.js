@@ -33,25 +33,12 @@ var AzureTableClient = new botbuilder_azure.AzureTableClient("BotStorage", "trav
 var UserTable = new botbuilder_azure.AzureBotStorage({ gzipData: false }, AzureTableClient);
 var tableService = azureStorage.createTableService('DefaultEndpointsProtocol=https;AccountName=travelrbotc4g2ai;AccountKey=cL2Xq/C6MW2ihDet27iU8440FFj1KU0K0TIo1QnYJ3gvyWQ4cn6LysyZInjE0jdeTW75zBTAgTbmkDriNlky0g==;EndpointSuffix=core.windows.net');
 var entGen = azureStorage.TableUtilities.entityGenerator;
+let time = Date.now();
+let now = time.toString();
 //=========================================================
 // Bot Config
 //=========================================================
-var bot = new builder.UniversalBot(connector, [
-    function (session) {
-        builder.Prompts.choice(session, "Hello and welcome to Travelr! What would you like to do?", ["Find Transportation", "Access Account", "Info/Help"]);
-    },
-    function (session, results, next) {
-        if (results.response.index == 0) {
-            session.beginDialog("/main");
-        }
-        else if (results.response.index == 1) {
-            session.beginDialog("/account");
-        }
-        else if (results.response.index == 2) {
-            session.beginDialog("/help");
-        }
-    }
-]).set('storage', UserTable);
+var bot = new builder.UniversalBot(connector).set('storage', UserTable);
 bot.localePath(path.join(__dirname, './locale'));
 //=========================================================
 // Universal Functions
@@ -154,6 +141,28 @@ bot.beginDialogAction("endConversation", "/end");
 //=========================================================
 // Bots Dialogs
 //=========================================================
+//=========================================================
+// Bots Dialogs
+//=========================================================
+bot.dialog('/', [
+    function (session) {
+        builder.Prompts.choice(session, "Hello and welcome to Travelr! What would you like to do?", ["Find Transportation", "Access Account", "Info/Help"]);
+    },
+    function (session, results, next) {
+        if (results.response.index == 0) {
+            session.beginDialog("/main");
+        }
+        else if (results.response.index == 1) {
+            session.beginDialog("/account");
+        }
+        else if (results.response.index == 2) {
+            session.beginDialog("/help");
+        }
+    },
+    function (session) {
+        session.replaceDialog('/');
+    }
+]);
 bot.dialog('/main', [
     // send the intro
     function (session, args, next) {
@@ -307,7 +316,7 @@ bot.dialog("/locations", [
 });
 bot.dialog('/calculation', [
     //=========================================================
-    // Map information 
+    // Map information and Table Upload
     //=========================================================
     // Begin processing the information
     function (session, args, next) {
@@ -317,6 +326,63 @@ bot.dialog('/calculation', [
         var end_lat = session.privateConversationData.end_lat;
         var start_long = session.privateConversationData.start_long;
         var end_long = session.privateConversationData.end_long;
+        var start = session.privateConversationData.start;
+        var end = session.privateConversationData.end;
+        var phone = session.userData.phone;
+        var pin = session.userData.pin;
+        if (phone && pin) {
+            // Get there account information for visted locations
+            var query = new azureStorage.TableQuery()
+                .select(["Visited_Locations"])
+                .where('PartitionKey eq ?', phone)
+                .and("RowKey eq ?", pin);
+            // Execute the query 
+            tableService.queryEntities("User", query, null, function (error, results, response) {
+                if (error) {
+                    console.log("Thee was an error seraching for the person");
+                    console.log(error);
+                }
+                else {
+                    console.log("No errors commiting query");
+                    if (results.entries.length == 0) {
+                        console.log("Person was not found");
+                    }
+                    else {
+                        console.log(results.entries);
+                        var visitedLocations = JSON.parse(results.entries[0].Visited_Locations._);
+                        visitedLocations[now] =
+                            {
+                                start: {
+                                    name: start,
+                                    lat: start_lat,
+                                    long: start_long
+                                },
+                                end: {
+                                    name: end,
+                                    lat: end_lat,
+                                    long: end_long
+                                }
+                            };
+                        // Send the users information to the cloud as a string
+                        // Form the entity to be sent 
+                        var updateUser = {
+                            PartitionKey: entGen.String(phone),
+                            RowKey: entGen.String(pin),
+                            Visited_Locations: entGen.String(JSON.stringify(visitedLocations))
+                        };
+                        tableService.insertOrMergeEntity("User", updateUser, function (error, result, response) {
+                            if (!error) {
+                                console.log("User info updated on the table");
+                            }
+                            else {
+                                console.log("There was an error adding the person: \n\n");
+                                console.log(error);
+                            }
+                        });
+                    }
+                }
+            });
+        }
         var MainUrl = "https://maps.googleapis.com/maps/api/staticmap?";
         var Key = "&key=AIzaSyDQmIfhoqmGszLRkinJi7mD7SEWt2bQFv8";
         // Set the constants
@@ -324,35 +390,18 @@ bot.dialog('/calculation', [
         var Format = "&format=png";
         var MarkerStyleStart = "&markers=color:red|label:A|" + start_lat + "," + start_long;
         var MarkerStyleEnd = "&markers=color:red|label:B|" + end_lat + "," + end_long;
-        var Path = "&path=color:blue|" + session.privateConversationData.start_lat + "," + session.privateConversationData.start_long + "|" + session.privateConversationData.end_lat + "," + session.privateConversationData.end_long;
+        var Path = "&path=color:blue|" + start_lat + "," + start_long + "|" + end_lat + "," + end_long;
         var Query = MainUrl + Size + Format + MarkerStyleStart + MarkerStyleEnd + Path + Key;
         session.send("Here is a map of your locations");
         // Build the new message 
-        var msg = new builder.Message(session)
-            .attachments([{
+        var msg = new builder.Message(session).attachments([{
                 contentType: "image/png",
                 contentUrl: Query
             }]);
         // Send the message
         session.send(msg);
-        // Go to the next step
-        next();
-    },
-    //=========================================================
-    // Get all of the information
-    //=========================================================
-    // Get transit
-    function (session, ars, next) {
-        var time = Date.now();
-        var now = time.toString();
         // Log step to console
         console.log("Getting Google Transit informaiton");
-        // Set the constants 
-        // pull down the lats and long
-        var start_lat = session.privateConversationData.start_lat;
-        var end_lat = session.privateConversationData.end_lat;
-        var start_long = session.privateConversationData.start_long;
-        var end_long = session.privateConversationData.end_long;
         // Flags for finished api pulls
         var transitFlag = false;
         var uberFlag = false;
@@ -1680,7 +1729,7 @@ bot.dialog('/addFavorites', [
     },
     function (session, results, next) {
         session.dialogData.tempFavoriteLocationAddress = results.response;
-        builder.Prompts.choice(session, "You said your location name was '" + session.dialogData.tempFavoriteLocationName + " and the address was " + results.response + ". Is that correct?'", ["Yes", "No"]);
+        builder.Prompts.choice(session, "You said your location name was '" + session.dialogData.tempFavoriteLocationName + "' and the address was '" + results.response + ".' Is that correct?", ["Yes", "No"]);
     },
     function (session, results, next) {
         if (results.response.index == 0) {
@@ -1791,7 +1840,7 @@ bot.dialog('/login', [
 ]);
 bot.dialog('/edit', [
     function (session, args, next) {
-        session.send("Welcome to the 'Account Edit Dialog! We need to make sure you are logged in in first!'");
+        session.send("Welcome to the 'Account Edit Dialog!' We need to make sure you are logged in in first!");
         // check to see if there is user data
         // Go to the next step in the waterfall
         if (session.userData.phone && session.userData.pin) {

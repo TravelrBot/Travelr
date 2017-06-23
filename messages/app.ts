@@ -44,6 +44,8 @@ let UserTable = new botbuilder_azure.AzureBotStorage({gzipData: false}, AzureTab
 
 let tableService: azureStorage.TableService = azureStorage.createTableService('DefaultEndpointsProtocol=https;AccountName=travelrbotc4g2ai;AccountKey=cL2Xq/C6MW2ihDet27iU8440FFj1KU0K0TIo1QnYJ3gvyWQ4cn6LysyZInjE0jdeTW75zBTAgTbmkDriNlky0g==;EndpointSuffix=core.windows.net');
 let entGen = azureStorage.TableUtilities.entityGenerator;
+let time = Date.now();
+let now = time.toString();
 //=========================================================
 // Bot Config
 //=========================================================
@@ -430,7 +432,7 @@ bot.dialog("/locations", [
 
 bot.dialog('/calculation',[
 //=========================================================
-// Map information 
+// Map information and Table Upload
 //=========================================================
 
     // Begin processing the information
@@ -443,6 +445,82 @@ bot.dialog('/calculation',[
         let end_lat: number = session.privateConversationData.end_lat;
         let start_long: number = session.privateConversationData.start_long;
         let end_long: number = session.privateConversationData.end_long;
+        let start: string = session.privateConversationData.start;
+        let end: string = session.privateConversationData.end;
+        let phone: string = session.userData.phone;
+        let pin: string = session.userData.pin;
+        
+
+        if (phone && pin) // they have an account
+        {
+            // Get there account information for visted locations
+            let query = new azureStorage.TableQuery()
+                .select(["Visited_Locations"])
+                .where('PartitionKey eq ?', phone)
+                .and("RowKey eq ?", pin);
+            
+            // Execute the query 
+            tableService.queryEntities("User", query, null, (error, results, response) =>
+            {
+                if (error)
+                {
+                    console.log("Thee was an error seraching for the person");
+                    console.log(error);
+                }
+                else
+                {   
+                    console.log("No errors commiting query");
+
+                    if (results.entries.length == 0) // if there were no entries
+                    {
+                        console.log("Person was not found");
+                    }
+                    else
+                    {
+                        console.log(results.entries);
+                        let visitedLocations = JSON.parse(results.entries[0].Visited_Locations._)
+                        
+                        visitedLocations[now] = 
+                        {
+                            start: 
+                                {
+                                    name: start,
+                                    lat: start_lat,
+                                    long: start_long
+                                }, 
+                                end:
+                                {
+                                    name: end, 
+                                    lat: end_lat,
+                                    long: end_long
+                                }
+                        }
+                        // Send the users information to the cloud as a string
+                        // Form the entity to be sent 
+                        let updateUser = 
+                        {
+                            PartitionKey: entGen.String(phone),
+                            RowKey: entGen.String(pin),
+                            Visited_Locations: entGen.String(JSON.stringify(visitedLocations))
+                        };
+                        tableService.insertOrMergeEntity("User", updateUser, (error, result, response) =>
+                        {
+                            if (!error) 
+                            {
+                                console.log("User info updated on the table");
+                            }
+                            else 
+                            {
+                                console.log("There was an error adding the person: \n\n");
+                                console.log(error);
+                            }
+                        })   
+                    }
+                }
+            })
+
+                
+        }
 
         let MainUrl: string = "https://maps.googleapis.com/maps/api/staticmap?";
 
@@ -457,15 +535,14 @@ bot.dialog('/calculation',[
 
         let MarkerStyleEnd: string = "&markers=color:red|label:B|" + end_lat + "," + end_long; 
 
-        let Path: string = "&path=color:blue|" + session.privateConversationData.start_lat + "," + session.privateConversationData.start_long + "|" + session.privateConversationData.end_lat + "," + session.privateConversationData.end_long;
+        let Path: string = "&path=color:blue|" + start_lat + "," + start_long + "|" + end_lat + "," + end_long;
 
         let Query: string = MainUrl + Size + Format + MarkerStyleStart + MarkerStyleEnd + Path + Key; 
 
         session.send("Here is a map of your locations");
 
         // Build the new message 
-        var msg = new builder.Message(session)
-        .attachments([{
+        var msg = new builder.Message(session).attachments([{
             contentType: "image/png",
             contentUrl: Query
         }]);
@@ -473,30 +550,8 @@ bot.dialog('/calculation',[
         // Send the message
         session.send(msg);
 
-        // Go to the next step
-        next();
-
-    },
-
-//=========================================================
-// Get all of the information
-//=========================================================
-
-    // Get transit
-    function(session: builder.Session, ars: any, next: Function)
-    {
-        let time = Date.now();
-        let now = time.toString();
-
         // Log step to console
         console.log("Getting Google Transit informaiton")
-
-        // Set the constants 
-        // pull down the lats and long
-        const start_lat: string = session.privateConversationData.start_lat;
-        const end_lat: string = session.privateConversationData.end_lat;
-        const start_long: string = session.privateConversationData.start_long;
-        const end_long: string = session.privateConversationData.end_long; 
 
         // Flags for finished api pulls
         let transitFlag: boolean = false;

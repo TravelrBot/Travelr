@@ -3,6 +3,7 @@ import * as restify from "restify";
 import * as process from "process";
 import * as botbuilder_azure from "botbuilder-azure";
 import * as azure from 'azure-storage';
+import * as locationDialog from 'botbuilder-location';
 var server = restify.createServer();
 
 server.listen(process.env.port || process.env.PORT || 3979, function () {
@@ -13,6 +14,7 @@ var connector = new builder.ChatConnector({
     appPassword: ''
 });
 server.post('/api/messages', connector.listen());
+
 var tableService = azure.createTableService('DefaultEndpointsProtocol=https;AccountName=travelrbotc4g2ai;AccountKey=cL2Xq/C6MW2ihDet27iU8440FFj1KU0K0TIo1QnYJ3gvyWQ4cn6LysyZInjE0jdeTW75zBTAgTbmkDriNlky0g==;EndpointSuffix=core.windows.net');
 let AzureTableClient = new botbuilder_azure.AzureTableClient("BotStorage", "travelrbotc4g2ai", 
     'cL2Xq/C6MW2ihDet27iU8440FFj1KU0K0TIo1QnYJ3gvyWQ4cn6LysyZInjE0jdeTW75zBTAgTbmkDriNlky0g==')
@@ -23,7 +25,9 @@ var entGen = azure.TableUtilities.entityGenerator;
 var time = Date.now();
 var now = time.toString();
 
-function PhoneStrip(phone: string): string
+bot.library(locationDialog.createLibrary("Ag2_gxEa3qcbVGAeEqKMcPptES--_GKGXIFi5TJl8Z2kuGF5BVxIXuVn3LIkdGSr"));
+
+/*function PhoneStrip(phone: string): string
 {
     let finalPhone: string = '';
     for (let index = 0; index < phone.length; index++) 
@@ -400,3 +404,5 @@ bot.dialog('/edit', [
     }
 
 ])
+
+*/

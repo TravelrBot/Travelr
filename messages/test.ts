@@ -27,6 +27,13 @@ var now = time.toString();
 
 bot.library(locationDialog.createLibrary("Ag2_gxEa3qcbVGAeEqKMcPptES--_GKGXIFi5TJl8Z2kuGF5BVxIXuVn3LIkdGSr"));
 
+bot.dialog("/", [
+    function (session: builder.Session)
+    {
+        
+    }
+])
+
 /*function PhoneStrip(phone: string): string
 {
     let finalPhone: string = '';

@@ -152,19 +152,22 @@ bot.dialog("/help", [
 
     (session: builder.Session, results: builder.IPromptChoiceResult, next: any) =>
     {
-        if (results.response.index == 0)
+        if (results.response)
         {
-            session.beginDialog('/info');
-            next();
-        }
-        else if (results.response.index == 1)
-        {
-            session.beginDialog('/commands');
-            next();
-        }
-        else
-        {
-            session.endDialog("Leaving the help dialog and returning you to your step!");
+            if (results.response.index == 0)
+            {
+                session.beginDialog('/info');
+                next();
+            }
+            else if (results.response.index == 1)
+            {
+                session.beginDialog('/commands');
+                next();
+            }
+            else
+            {
+                session.endDialog("Leaving the help dialog and returning you to your step!");
+            }
         }
 
     },
@@ -204,17 +207,20 @@ bot.dialog('/', [
     },
     (session: builder.Session, results: builder.IPromptChoiceResult, next: any) =>
     {
-        if (results.response.index == 0) // find transportation
+        if (results.response)
         {
-            session.beginDialog("/main");
-        }
-        else if (results.response.index == 1) // access account 
-        {
-            session.beginDialog("/account");
-        }
-        else if (results.response.index == 2) 
-        {
-            session.beginDialog("/help");
+            if (results.response.index == 0) // find transportation
+            {
+                session.beginDialog("/main");
+            }
+            else if (results.response.index == 1) // access account 
+            {
+                session.beginDialog("/account");
+            }
+            else if (results.response.index == 2) 
+            {
+                session.beginDialog("/help");
+            }
         }
     },
     (session: builder.Session) =>
@@ -241,19 +247,22 @@ bot.dialog('/preferences', [
     function (session: builder.Session, result: builder.IPromptChoiceResult, next: any)
     {
         console.log("Determining result");
-        switch (result.response.index) 
+        if (result.response)
         {
-            case 0:
-                session.privateConversationData.perference = 0;
-                break;
-            case 1:
-                session.privateConversationData.perference = 1;
-                break;
-            case 2:
-                session.privateConversationData.perference = 2;
-            default:
-                session.privateConversationData.perference = 0;
-                break;
+            switch (result.response.index) 
+            {
+                case 0:
+                    session.privateConversationData.perference = 0;
+                    break;
+                case 1:
+                    session.privateConversationData.perference = 1;
+                    break;
+                case 2:
+                    session.privateConversationData.perference = 2;
+                default:
+                    session.privateConversationData.perference = 0;
+                    break;
+            }
         }
 
         next();
@@ -267,19 +276,23 @@ bot.dialog('/preferences', [
     function (session: builder.Session, result: builder.IPromptChoiceResult,
     next: Function): void
     {
-        switch (result.response.index) {
-            case 0:
-                session.privateConversationData.group = 0;
-                break;
-            case 1: 
-                session.privateConversationData.group = 1;
-                break;
-            case 2:
-                session.privateConversationData.group = 2
-                break;
-            default:
-                session.privateConversationData.group = 1;
-                break;
+        if (result.response)
+        {
+            switch (result.response.index) 
+            {
+                case 0:
+                    session.privateConversationData.group = 0;
+                    break;
+                case 1: 
+                    session.privateConversationData.group = 1;
+                    break;
+                case 2:
+                    session.privateConversationData.group = 2
+                    break;
+                default:
+                    session.privateConversationData.group = 1;
+                    break;
+            }
         }
 
         // Go to the next step
@@ -311,20 +324,23 @@ bot.dialog("/locations", [
     },
     (session: builder.Session, results: builder.IPromptChoiceResult, next: any) =>
     {
-        if (results.response.index == 0) // if the user wants a custom location
+        if (results.response)
         {
-            builder.Prompts.text(session, "What is your starting location? (E.g. 22nd and Main Austin Texas or JKF Airport)");
-        }
-        else
-        {
-            // Find the key's pair 
-            let favoriteLocations = session.userData.favoriteLocations;
-            for (let key in favoriteLocations)
+            if (results.response.index == 0) // if the user wants a custom location
             {
-                if (key == results.response.entity)
+                builder.Prompts.text(session, "What is your starting location? (E.g. 22nd and Main Austin Texas or JKF Airport)");
+            }
+            else
+            {
+                // Find the key's pair 
+                let favoriteLocations = session.userData.favoriteLocations;
+                for (let key in favoriteLocations)
                 {
-                    session.privateConversationData.start = favoriteLocations[key];
-                    next();
+                    if (key == results.response.entity)
+                    {
+                        session.privateConversationData.start = favoriteLocations[key];
+                        next();
+                    }
                 }
             }
         }
@@ -375,20 +391,23 @@ bot.dialog("/locations", [
 
     (session: builder.Session, results: builder.IPromptChoiceResult, next: any) =>
     {
-        if (results.response.index == 0) // if the user wants a custom location
+        if (results.response)
         {
-            builder.Prompts.text(session, "What is your destination? (E.g. 1600 Pennsylvania Avenue  or The Space Needle)");
-        }
-        else
-        {
-            // Find the key's pair 
-            let favoriteLocations = session.userData.favoriteLocations;
-            for (let key in favoriteLocations)
+            if (results.response.index == 0) // if the user wants a custom location
             {
-                if (key == results.response.entity)
+                builder.Prompts.text(session, "What is your destination? (E.g. 1600 Pennsylvania Avenue  or The Space Needle)");
+            }
+            else
+            {
+                // Find the key's pair 
+                let favoriteLocations = session.userData.favoriteLocations;
+                for (let key in favoriteLocations)
                 {
-                    session.privateConversationData.end = favoriteLocations[key];
-                    next();
+                    if (key == results.response.entity)
+                    {
+                        session.privateConversationData.end = favoriteLocations[key];
+                        next();
+                    }
                 }
             }
         }
@@ -1834,394 +1853,398 @@ bot.dialog("/options", [
         let endLat: string = session.privateConversationData.end_lat; 
         let endLong: string = session.privateConversationData.end_long;
 
-        // User wants to see transit information
-        if (response.response.index == 0)
+        if (response.response)
         {
-            if (transit.transitArrivalTime == "Error")
+            // User wants to see transit information
+            if (response.response.index == 0)
             {
-                session.send("There was an error when looking for transit in your locations.")
-            }
-            else
-            {
-                if (session.message.source != 'skype')
+                if (transit.transitArrivalTime == "Error")
                 {
-                    // Array to Hold all direction string 
-                    let stepMessage: any[] = [];
-
-                    for (let step: number = 0; step < transit.transitSteps.length; step++) 
+                    session.send("There was an error when looking for transit in your locations.")
+                }
+                else
+                {
+                    if (session.message.source != 'skype')
                     {
-                        // Check to see if walking or transit step
-                        if ( transit.transitSteps[step].stepTransitMode == "WALKING")
+                        // Array to Hold all direction string 
+                        let stepMessage: any[] = [];
+
+                        for (let step: number = 0; step < transit.transitSteps.length; step++) 
                         {
-                            let walkingStep: Transit.IStepWalkingInfo = transit.transitSteps[step] as Transit.IStepWalkingInfo;
-
-                            let instructions = 
-                            [
-                                {
-                                    "type": "TextBlock",
-                                    "text": `${walkingStep.stepMainInstruction}`,
-                                    "size": "medium",
-                                    "weight": "bolder",
-                                    "wrap": true
-
-                                },
-                                {
-                                    "type": "TextBlock",
-                                    "text": `- Distance: ${walkingStep.stepDistance}`,
-                                    "wrap": true
-                                },
-                                {
-                                    "type": "TextBlock",
-                                    "text": `- Duration: ${walkingStep.stepDuration}`,
-                                    "wrap": true
-                                }
-                            ]
-
-
-                            for (let step: number = 0; step < walkingStep.stepDeatiledInstructions.length; step++)
+                            // Check to see if walking or transit step
+                            if ( transit.transitSteps[step].stepTransitMode == "WALKING")
                             {
-                                if (step == walkingStep.stepDeatiledInstructions.length - 1)
-                                {
-                                    instructions.push(
-                                        {
-                                            "type": "TextBlock",
-                                            "text": `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction}`,
-                                            "wrap": true   
-                                        }
-                                    );
-                                }
-                                else
-                                {
-                                    instructions.push(
-                                        {
-                                            "type": "TextBlock",
-                                            "text": `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction}` ,
-                                            "wrap": true  
-                                        });
-                                }
-                            }
+                                let walkingStep: Transit.IStepWalkingInfo = transit.transitSteps[step] as Transit.IStepWalkingInfo;
 
-                            instructions.forEach(step => {
-                                stepMessage.push(step);
-                            });
-                        }
-
-                        else
-                        {
-                            let transitStep: Transit.IStepTransitInfo = transit.transitSteps[step] as Transit.IStepTransitInfo;
-                            let transitMessage: any[] = 
-                            [
-                                {
-                                    "type": "TextBlock",
-                                    "text": `${transitStep.stepMainInstruction}`,
-                                    "size": "medium",
-                                    "weight": "bolder",
-                                    "wrap": true   
-
-                                },
-                                {
-                                    "type": "TextBlock",
-                                    "text": `- Depature Name: ${transitStep.departureStopName}`,
-                                    "wrap": true  
-                                },
-                                {
-                                    "type": "TextBlock",
-                                    "text": `- Deapture Time: ${transitStep.departureStopTime}`,
-                                    "wrap": true  
-                                },
-                                {
-                                    "type": "TextBlock",
-                                    "text": `- Arrival Name: ${transitStep.arrivalStopName}`,
-                                    "wrap": true  
-                                },
-                                {
-                                    "type": "TextBlock",
-                                    "text": `- Arrival Time: ${transitStep.arrivalStopTime}`,
-                                    "wrap": true  
-                                },
-                                {
-                                    "type": "TextBlock",
-                                    "text": `- Distance: ${transitStep.stepDistance} miles`,
-                                    "wrap": true  
-                                },
-                                {
-                                    "type": "TextBlock",
-                                    "text": `- Duration: ${transitStep.stepDuration} minutes`,
-                                    "wrap": true  
-                                },
-                                {
-                                    "type": "TextBlock",
-                                    "text": `- Number of Stops: ${transitStep.numberOfStop}`,
-                                    "wrap": true  
-                                },
-                                {
-                                    "type": "TextBlock",
-                                    "text": `- Vehicle Name: ${transitStep.vehicleName} `,
-                                    "wrap": true  
-                                },
-                                {
-                                    "type": "TextBlock",
-                                    "text": `- Vehicle Type: ${transitStep.vehicleType}`,
-                                    "wrap": true  
-                                }
-                            ];
-
-                            transitMessage.forEach(step => {
-                                stepMessage.push(step);
-                            })
-
-                        }
-                    }
-
-                    // Build the step by step directions
-                    let directionMessage: builder.Message = new builder.Message(session)
-                        .addAttachment({
-                            contentType: "application/vnd.microsoft.card.adaptive",
-                            content: 
-                            {
-                                type: 'AdaptiveCard',
-                                body: 
+                                let instructions = 
                                 [
                                     {
-                                        "type": "Container",
-                                        "separation": "default",
-                                        "items":
-                                        [
+                                        "type": "TextBlock",
+                                        "text": `${walkingStep.stepMainInstruction}`,
+                                        "size": "medium",
+                                        "weight": "bolder",
+                                        "wrap": true
+
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `- Distance: ${walkingStep.stepDistance}`,
+                                        "wrap": true
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `- Duration: ${walkingStep.stepDuration}`,
+                                        "wrap": true
+                                    }
+                                ]
+
+
+                                for (let step: number = 0; step < walkingStep.stepDeatiledInstructions.length; step++)
+                                {
+                                    if (step == walkingStep.stepDeatiledInstructions.length - 1)
+                                    {
+                                        instructions.push(
                                             {
                                                 "type": "TextBlock",
-                                                "text": "Transit Steps",
-                                                "size": "large",
-                                                "weight": "bolder"
+                                                "text": `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction}`,
+                                                "wrap": true   
                                             }
-                                        ]
+                                        );
+                                    }
+                                    else
+                                    {
+                                        instructions.push(
+                                            {
+                                                "type": "TextBlock",
+                                                "text": `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction}` ,
+                                                "wrap": true  
+                                            });
+                                    }
+                                }
+
+                                instructions.forEach(step => {
+                                    stepMessage.push(step);
+                                });
+                            }
+
+                            else
+                            {
+                                let transitStep: Transit.IStepTransitInfo = transit.transitSteps[step] as Transit.IStepTransitInfo;
+                                let transitMessage: any[] = 
+                                [
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `${transitStep.stepMainInstruction}`,
+                                        "size": "medium",
+                                        "weight": "bolder",
+                                        "wrap": true   
+
                                     },
                                     {
-                                        "type": "Container",
-                                        "items": stepMessage
+                                        "type": "TextBlock",
+                                        "text": `- Depature Name: ${transitStep.departureStopName}`,
+                                        "wrap": true  
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `- Deapture Time: ${transitStep.departureStopTime}`,
+                                        "wrap": true  
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `- Arrival Name: ${transitStep.arrivalStopName}`,
+                                        "wrap": true  
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `- Arrival Time: ${transitStep.arrivalStopTime}`,
+                                        "wrap": true  
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `- Distance: ${transitStep.stepDistance} miles`,
+                                        "wrap": true  
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `- Duration: ${transitStep.stepDuration} minutes`,
+                                        "wrap": true  
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `- Number of Stops: ${transitStep.numberOfStop}`,
+                                        "wrap": true  
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `- Vehicle Name: ${transitStep.vehicleName} `,
+                                        "wrap": true  
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `- Vehicle Type: ${transitStep.vehicleType}`,
+                                        "wrap": true  
                                     }
-                                            
-                                ]   
-                            }
-                        })
+                                ];
 
-                    session.send(directionMessage);
+                                transitMessage.forEach(step => {
+                                    stepMessage.push(step);
+                                })
 
-                    // repeat the dialog
-                    session.replaceDialog('/options');
-                }
-
-                else // if the user is using skype
-                {
-                    // Array to Hold all direction string 
-                    let directions: string = "";
-
-                    for (let step: number = 0; step < transit.transitSteps.length; step++) 
-                    {
-                        // Check to see if walking or transit step
-                        if ( transit.transitSteps[step].stepTransitMode == "WALKING")
-                        {
-                            let walkingStep: Transit.IStepWalkingInfo = transit.transitSteps[step] as Transit.IStepWalkingInfo;
-
-                            directions += `${walkingStep.stepMainInstruction} <br/> 
-                            - Distance: ${walkingStep.stepDistance} <br/>
-                            - Duration: ${walkingStep.stepDuration} <br/>
-                            `;
-
-                            for (let step: number = 0; step < walkingStep.stepDeatiledInstructions.length; step++)
-                            {
-                                if (step == walkingStep.stepDeatiledInstructions.length - 1)
-                                {
-                                    directions += `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction} <br/>`;
-                                }
-                                else
-                                {
-                                    directions += `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction} <br/> 
-                                    `;
-                                }
                             }
                         }
 
-                        else
-                        {
-                            let transitStep: Transit.IStepTransitInfo = transit.transitSteps[step] as Transit.IStepTransitInfo;
-                            
-                            directions += `${transitStep.stepMainInstruction} <br/>
-                            - Depature Name: ${transitStep.departureStopName} <br/>
-                            - Deapture Time: ${transitStep.departureStopTime} <br/>
-                            - Arrival Name: ${transitStep.arrivalStopName} <br/>
-                            - Arrival Time: ${transitStep.arrivalStopTime} <br/>
-                            - Distance: ${transitStep.stepDistance} miles <br/>
-                            - Duration: ${transitStep.stepDuration} minutes <br/>
-                            - Number of Stops: ${transitStep.numberOfStop} <br/>
-                            - Vehicle Name: ${transitStep.vehicleName} <br/>
-                            - Vehicle Type: ${transitStep.vehicleType} <br/>`
-                        }
+                        // Build the step by step directions
+                        let directionMessage: builder.Message = new builder.Message(session)
+                            .addAttachment({
+                                contentType: "application/vnd.microsoft.card.adaptive",
+                                content: 
+                                {
+                                    type: 'AdaptiveCard',
+                                    body: 
+                                    [
+                                        {
+                                            "type": "Container",
+                                            "separation": "default",
+                                            "items":
+                                            [
+                                                {
+                                                    "type": "TextBlock",
+                                                    "text": "Transit Steps",
+                                                    "size": "large",
+                                                    "weight": "bolder"
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "type": "Container",
+                                            "items": stepMessage
+                                        }
+                                                
+                                    ]   
+                                }
+                            })
+
+                        session.send(directionMessage);
+
+                        // repeat the dialog
+                        session.replaceDialog('/options');
                     }
 
-                    session.send(directions);
+                    else // if the user is using skype
+                    {
+                        // Array to Hold all direction string 
+                        let directions: string = "";
 
-                    // repeat the dialog
-                    session.replaceDialog('/options');
-                }
-
-                
-            }
-        }
-
-        // User want ridesharing information
-        else if (response.response.index == 1)
-        {
-            // Check the rideshare service provider
-            if (rideshare.serviceProvider == "Uber")
-            {
-                if (session.message.source != 'skype')
-                {
-                    let uberClientId: string = '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP' //process.env.UBER_APP_ID
-
-                    // Format the addresses
-                    let pickup: string = LocationAddressFomater(session.privateConversationData.start);
-                    let dropoff: string = LocationAddressFomater(session.privateConversationData.end);
-
-
-                    let uberString: string = `https://m.uber.com/ul/?action=setPickup&client_id=${uberClientId}&product_id=${rideshare.proudctId}&pickup[formatted_address]=${pickup}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&dropoff[formatted_address]=${dropoff}&dropoff[latitude]=${endLat}&dropoff[longitude]=${endLong}`;
-                    
-                    let uberCard: builder.Message = new builder.Message(session)
-                        /*.addAttachment({
-                            contentType: "application/vnd.microsoft.card.adaptive",
-                            content:
+                        for (let step: number = 0; step < transit.transitSteps.length; step++) 
+                        {
+                            // Check to see if walking or transit step
+                            if ( transit.transitSteps[step].stepTransitMode == "WALKING")
                             {
-                                type: "AdaptiveCard",
-                                body:
-                                [
+                                let walkingStep: Transit.IStepWalkingInfo = transit.transitSteps[step] as Transit.IStepWalkingInfo;
+
+                                directions += `${walkingStep.stepMainInstruction} <br/> 
+                                - Distance: ${walkingStep.stepDistance} <br/>
+                                - Duration: ${walkingStep.stepDuration} <br/>
+                                `;
+
+                                for (let step: number = 0; step < walkingStep.stepDeatiledInstructions.length; step++)
+                                {
+                                    if (step == walkingStep.stepDeatiledInstructions.length - 1)
                                     {
-                                        "type": "TextBlock",
-                                        "text": "Click the image or link to open the app and order your ride!"
-                                    },
+                                        directions += `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction} <br/>`;
+                                    }
+                                    else
                                     {
-                                        "type": "Image",
-                                        "url": 'https://d1a3f4spazzrp4.cloudfront.net/uber-com/1.2.29/d1a3f4spazzrp4.cloudfront.net/images/apple-touch-icon-144x144-279d763222.png',
-                                        "size": "small",
-                                        "selectAction": 
+                                        directions += `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction} <br/> 
+                                        `;
+                                    }
+                                }
+                            }
+
+                            else
+                            {
+                                let transitStep: Transit.IStepTransitInfo = transit.transitSteps[step] as Transit.IStepTransitInfo;
+                                
+                                directions += `${transitStep.stepMainInstruction} <br/>
+                                - Depature Name: ${transitStep.departureStopName} <br/>
+                                - Deapture Time: ${transitStep.departureStopTime} <br/>
+                                - Arrival Name: ${transitStep.arrivalStopName} <br/>
+                                - Arrival Time: ${transitStep.arrivalStopTime} <br/>
+                                - Distance: ${transitStep.stepDistance} miles <br/>
+                                - Duration: ${transitStep.stepDuration} minutes <br/>
+                                - Number of Stops: ${transitStep.numberOfStop} <br/>
+                                - Vehicle Name: ${transitStep.vehicleName} <br/>
+                                - Vehicle Type: ${transitStep.vehicleType} <br/>`
+                            }
+                        }
+
+                        session.send(directions);
+
+                        // repeat the dialog
+                        session.replaceDialog('/options');
+                    }
+
+                    
+                }
+            }
+
+            // User want ridesharing information
+            else if (response.response.index == 1)
+            {
+                // Check the rideshare service provider
+                if (rideshare.serviceProvider == "Uber")
+                {
+                    if (session.message.source != 'skype')
+                    {
+                        let uberClientId: string = '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP' //process.env.UBER_APP_ID
+
+                        // Format the addresses
+                        let pickup: string = LocationAddressFomater(session.privateConversationData.start);
+                        let dropoff: string = LocationAddressFomater(session.privateConversationData.end);
+
+
+                        let uberString: string = `https://m.uber.com/ul/?action=setPickup&client_id=${uberClientId}&product_id=${rideshare.proudctId}&pickup[formatted_address]=${pickup}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&dropoff[formatted_address]=${dropoff}&dropoff[latitude]=${endLat}&dropoff[longitude]=${endLong}`;
+                        
+                        let uberCard: builder.Message = new builder.Message(session)
+                            /*.addAttachment({
+                                contentType: "application/vnd.microsoft.card.adaptive",
+                                content:
+                                {
+                                    type: "AdaptiveCard",
+                                    body:
+                                    [
+                                        {
+                                            "type": "TextBlock",
+                                            "text": "Click the image or link to open the app and order your ride!"
+                                        },
+                                        {
+                                            "type": "Image",
+                                            "url": 'https://d1a3f4spazzrp4.cloudfront.net/uber-com/1.2.29/d1a3f4spazzrp4.cloudfront.net/images/apple-touch-icon-144x144-279d763222.png',
+                                            "size": "small",
+                                            "selectAction": 
+                                            {
+                                                "type": "Action.OpenUrl",
+                                                "title": "Order Uber",
+                                                "url": uberString
+                                            }
+                                        }, 
                                         {
                                             "type": "Action.OpenUrl",
-                                            "title": "Order Uber",
+                                            "title": "Order an Uber",
                                             "url": uberString
                                         }
-                                    }, 
-                                    {
-                                        "type": "Action.OpenUrl",
-                                        "title": "Order an Uber",
-                                        "url": uberString
-                                    }
-                                ]
-                            }
-                        }) */
-                        .addAttachment(
-                            new builder.ThumbnailCard(session)
-                                .title("Order an Uber")
-                                .text("Click to order your Uber in the Uber App!")
-                                .images([builder.CardImage.create(session, 'https://d1a3f4spazzrp4.cloudfront.net/uber-com/1.2.29/d1a3f4spazzrp4.cloudfront.net/images/apple-touch-icon-144x144-279d763222.png')])
-                                .buttons([builder.CardAction.openUrl(session, uberString, "Order an Uber"),
-                                builder.CardAction.dialogAction(session, "repeatOptions", undefined, "Back to options" ),
-                                builder.CardAction.dialogAction(session, "endConversation", undefined, "Finish")])
-                                .tap(builder.CardAction.openUrl(session, uberString, "Order Uber"))
-                                )
+                                    ]
+                                }
+                            }) */
+                            .addAttachment(
+                                new builder.ThumbnailCard(session)
+                                    .title("Order an Uber")
+                                    .text("Click to order your Uber in the Uber App!")
+                                    .images([builder.CardImage.create(session, 'https://d1a3f4spazzrp4.cloudfront.net/uber-com/1.2.29/d1a3f4spazzrp4.cloudfront.net/images/apple-touch-icon-144x144-279d763222.png')])
+                                    .buttons([builder.CardAction.openUrl(session, uberString, "Order an Uber"),
+                                    builder.CardAction.dialogAction(session, "repeatOptions", undefined, "Back to options" ),
+                                    builder.CardAction.dialogAction(session, "endConversation", undefined, "Finish")])
+                                    .tap(builder.CardAction.openUrl(session, uberString, "Order Uber"))
+                                    )
 
-                    session.send(uberCard);
-                }
+                        session.send(uberCard);
+                    }
 
-                else // if the client is skype
+                    else // if the client is skype
+                    {
+                        let uberClientId: string = '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP' //process.env.UBER_APP_ID
+
+                        // Format the addresses
+                        let pickup: string = LocationAddressFomater(session.privateConversationData.start);
+                        let dropoff: string = LocationAddressFomater(session.privateConversationData.end);
+
+                        // Order the Uber
+                        session.send("Click the link to open the app and order your ride!");
+
+                        let uberString: string = `'https://m.uber.com/ul/?action=setPickup&client_id=${uberClientId}&product_id=${rideshare.proudctId}&pickup[formatted_address]=${pickup}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&dropoff[formatted_address]=${dropoff}&dropoff[latitude]=${endLat}&dropoff[longitude]=${endLong}`;
+                        
+                        session.send(uberString);
+                    }
+                        
+            }   
+
+                else if (rideshare.serviceProvider == 'Lyft')
                 {
-                    let uberClientId: string = '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP' //process.env.UBER_APP_ID
-
-                    // Format the addresses
-                    let pickup: string = LocationAddressFomater(session.privateConversationData.start);
-                    let dropoff: string = LocationAddressFomater(session.privateConversationData.end);
-
-                    // Order the Uber
-                    session.send("Click the link to open the app and order your ride!");
-
-                    let uberString: string = `'https://m.uber.com/ul/?action=setPickup&client_id=${uberClientId}&product_id=${rideshare.proudctId}&pickup[formatted_address]=${pickup}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&dropoff[formatted_address]=${dropoff}&dropoff[latitude]=${endLat}&dropoff[longitude]=${endLong}`;
-                    
-                    session.send(uberString);
-                }
-                    
-        }   
-
-            else if (rideshare.serviceProvider == 'Lyft')
-            {
-                if (session.message.source != 'skype')
-                {
-                    let clientId: string = '9LHHn1wknlgs';
+                    if (session.message.source != 'skype')
+                    {
+                        let clientId: string = '9LHHn1wknlgs';
 
 
-                    // Order the Lyft
-                    let lyftString: string = `https://lyft.com/ride?id=${rideshare.proudctId}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&partner=${clientId}&destination[latitude]=${endLat}&destination[longitude]=${endLong}`;
+                        // Order the Lyft
+                        let lyftString: string = `https://lyft.com/ride?id=${rideshare.proudctId}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&partner=${clientId}&destination[latitude]=${endLat}&destination[longitude]=${endLong}`;
 
-                    let lyftCard: builder.Message = new builder.Message(session)
-                        /*.addAttachment({
-                            contentType: "application/vnd.microsoft.card.adaptive",
-                            content:
-                            {
-                                type: "AdaptiveCard",
-                                body:
-                                [
-                                    {
-                                        "type": "TextBlock",
-                                        "text": "Click the image or link to open the app and order your ride!"
-                                    },
+                        let lyftCard: builder.Message = new builder.Message(session)
+                            /*.addAttachment({
+                                contentType: "application/vnd.microsoft.card.adaptive",
+                                content:
+                                {
+                                    type: "AdaptiveCard",
+                                    body:
+                                    [
+                                        {
+                                            "type": "TextBlock",
+                                            "text": "Click the image or link to open the app and order your ride!"
+                                        },
 
-                                    {
-                                        "type": "Image",
-                                        "url": 'https://www.lyft.com/apple-touch-icon-precomposed-152x152.png',
-                                        "size": "small",
-                                        "selectAction": 
+                                        {
+                                            "type": "Image",
+                                            "url": 'https://www.lyft.com/apple-touch-icon-precomposed-152x152.png',
+                                            "size": "small",
+                                            "selectAction": 
+                                            {
+                                                "type": "Action.OpenUrl",
+                                                "title": "Order Lyft",
+                                                "url": lyftString
+                                            }
+                                        }, 
                                         {
                                             "type": "Action.OpenUrl",
-                                            "title": "Order Lyft",
+                                            "title": "Order an Lyft",
                                             "url": lyftString
                                         }
-                                    }, 
-                                    {
-                                        "type": "Action.OpenUrl",
-                                        "title": "Order an Lyft",
-                                        "url": lyftString
-                                    }
-                                ]
-                            }
-                        }) */
-                    .addAttachment(new builder.ThumbnailCard(session)
-                        .title("Order your Lyft!")
-                        .text("Click the button to order your Lyft in the Lyft App!")
-                        .subtitle("If on SMS say 'Order Lyft' to order the ride")
-                        .images([builder.CardImage.create(session, "https://www.lyft.com/apple-touch-icon-precomposed-152x152.png")])
-                        .tap(builder.CardAction.openUrl(session, lyftString, "Order Lyft"))
-                        .buttons([builder.CardAction.openUrl(session, lyftString, "Order Lyft"), 
-                            builder.CardAction.dialogAction(session, "repeatOptions", undefined , "Back to options"),
-                            builder.CardAction.dialogAction(session, "endConversation", undefined, "Finish")]));
+                                    ]
+                                }
+                            }) */
+                        .addAttachment(new builder.ThumbnailCard(session)
+                            .title("Order your Lyft!")
+                            .text("Click the button to order your Lyft in the Lyft App!")
+                            .subtitle("If on SMS say 'Order Lyft' to order the ride")
+                            .images([builder.CardImage.create(session, "https://www.lyft.com/apple-touch-icon-precomposed-152x152.png")])
+                            .tap(builder.CardAction.openUrl(session, lyftString, "Order Lyft"))
+                            .buttons([builder.CardAction.openUrl(session, lyftString, "Order Lyft"), 
+                                builder.CardAction.dialogAction(session, "repeatOptions", undefined , "Back to options"),
+                                builder.CardAction.dialogAction(session, "endConversation", undefined, "Finish")]));
 
-                    session.send(lyftCard);
+                        session.send(lyftCard);
+                    }
+                    else // The source is skype
+                    {
+                        let clientId: string = '9LHHn1wknlgs';
+                        // Order the Lyft
+                        session.send("Or click the link to open the app and order your ride!");
+                        let lyftString: string = `https://lyft.com/ride?id=${rideshare.proudctId}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&partner=${clientId}&destination[latitude]=${endLat}&destination[longitude]=${endLong}`;
+                        session.send(lyftString);
+                    }
                 }
-                else // The source is skype
+
+                else // If there was on error
                 {
-                     let clientId: string = '9LHHn1wknlgs';
-                    // Order the Lyft
-                    session.send("Or click the link to open the app and order your ride!");
-                    let lyftString: string = `https://lyft.com/ride?id=${rideshare.proudctId}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&partner=${clientId}&destination[latitude]=${endLat}&destination[longitude]=${endLong}`;
-                    session.send(lyftString);
+                    session.send("We could not find any ridesharing options here");
                 }
             }
-
-            else // If there was on error
+            // User is done with the conversation
+            else
             {
-                session.send("We could not find any ridesharing options here");
+                session.endConversation("Thank you for using Travelr! Have a great day!");
             }
         }
-        // User is done with the conversation
-        else
-        {
-            session.endConversation("Thank you for using Travelr! Have a great day!");
-        }     
+                 
     }
 ]);
 
@@ -2234,48 +2257,51 @@ bot.dialog("/info", [
 
     function(session:builder.Session, response:builder.IPromptChoiceResult, next: any)
     {
-        if(response.response.index == 0)
+        if (response.response)
         {
-            session.send(`Company Info
-            
-            Travelr is all about creating a more enjoyable commuting experience.
-            
-            We are your urban travel guide to make your daily commute better we match your preferences and find the best options 
-            avialable for you including price, time, group size, and a luxurious option.
+            if(response.response.index == 0)
+            {
+                session.send(`Company Info
+                
+                Travelr is all about creating a more enjoyable commuting experience.
+                
+                We are your urban travel guide to make your daily commute better we match your preferences and find the best options 
+                avialable for you including price, time, group size, and a luxurious option.
 
-            By connecting users to one another we enhance the quality of everyone's dialy commute. This means that every user
-            depending on their choice will be able to find the quickest route, the cheapest ride, or the best luxury deal available.`
-            );
+                By connecting users to one another we enhance the quality of everyone's dialy commute. This means that every user
+                depending on their choice will be able to find the quickest route, the cheapest ride, or the best luxury deal available.`
+                );
+            }
+
+            else if(response.response.index == 1)
+            {
+                session.send(`Privacy
+                
+                Retainment of information
+
+                This bot is currently in beta. We do not ask for nor retain personal information including but not limited to: Name, DOB, Mailing or Biling Address, etc...
+                Although, not yet implemented, Travelr does intend to eventually retain your starting location, destiantion, and the best services our system produces. 
+                This information will eventually help us with creating a better and faster bot by allowing us to run analysis on the transportation systems in your geographic area.
+
+                Sale of information
+
+                We will not sell the retained informaiton. The informaiton will be used for our own purposes as stated above. We will update our privacy statements accordingly.`);
+            }
+
+            else if(response.response.index == 2)
+            {
+                session.send(`How It Works
+
+                Travelr asks the user for their commuting preferences and then it asks the user for their starting and ending locations. After
+                typing in their preferences and destination our algorithim internally finds the best choice for the user.`)
+            }
+            else
+            {
+                session.send("Returning you back to the help dialog!");
+                session.endDialog();
+            }
+        
         }
-
-        else if(response.response.index == 1)
-        {
-            session.send(`Privacy
-            
-            Retainment of information
-
-            This bot is currently in beta. We do not ask for nor retain personal information including but not limited to: Name, DOB, Mailing or Biling Address, etc...
-            Although, not yet implemented, Travelr does intend to eventually retain your starting location, destiantion, and the best services our system produces. 
-            This information will eventually help us with creating a better and faster bot by allowing us to run analysis on the transportation systems in your geographic area.
-
-            Sale of information
-
-            We will not sell the retained informaiton. The informaiton will be used for our own purposes as stated above. We will update our privacy statements accordingly.`);
-        }
-
-        else if(response.response.index == 2)
-        {
-            session.send(`How It Works
-
-            Travelr asks the user for their commuting preferences and then it asks the user for their starting and ending locations. After
-            typing in their preferences and destination our algorithim internally finds the best choice for the user.`)
-        }
-        else
-        {
-            session.send("Returning you back to the help dialog!");
-            session.endDialog();
-        }
-
         console.log("Going to the next step");
         next();
 
@@ -2299,21 +2325,24 @@ bot.dialog("/account", [
     {
         console.log("Directing the choice")
 
-        if (results.response.index == 0) // Sign up
+        if (results.response)
         {
-            session.beginDialog('/signUp');
-        }
-        else if (results.response.index == 1) // login
-        {
-            session.beginDialog('/login');
-        }
-        else if (results.response.index == 2) // edit
-        {
-            session.beginDialog('/edit')
-        }
-        else if (results.response.index == 3) // cancel
-        {
-            session.endDialog("Okay returning you to the main menu!")
+            if (results.response.index == 0) // Sign up
+            {
+                session.beginDialog('/signUp');
+            }
+            else if (results.response.index == 1) // login
+            {
+                session.beginDialog('/login');
+            }
+            else if (results.response.index == 2) // edit
+            {
+                session.beginDialog('/edit')
+            }
+            else if (results.response.index == 3) // cancel
+            {
+                session.endDialog("Okay returning you to the main menu!")
+            }
         }
 
     },
@@ -2352,7 +2381,8 @@ bot.dialog('/signUp', [
 
     function (session, results: builder.IPromptChoiceResult, next: any)
     {
-        if (results.response.index == 0) // yes
+        
+        if (results.response && results.response.index == 0) // yes
         {   session.send("Awesome, starting the 'Add Favorites' dialog!");
             console.log("starting the add favorites dialog!")
             let response: builder.Session = session.beginDialog('/addFavorites');
@@ -2437,7 +2467,7 @@ bot.dialog('/addFavorites', [
     },
     function(session: builder.Session, results: builder.IPromptChoiceResult, next: any)
     {
-        if (results.response.index == 0) // yes, the information is correct
+        if (results.response && results.response.index == 0) // yes, the information is correct
         {
             // add the information to the array of favorite locations
             let tempFavoriteLocationName: string = session.dialogData.tempFavoriteLocationName;
@@ -2465,7 +2495,7 @@ bot.dialog('/addFavorites', [
             builder.Prompts.choice(session, "Would you like to add another favorite?", ["Yes", "No"]);
 
         }
-        else if (results.response.index == 1) // no they are not correct
+        else if (results.response && results.response.index == 1) // no they are not correct
         {
             session.send("Okay we will start over");
             session.replaceDialog("/addFavorites");
@@ -2474,11 +2504,11 @@ bot.dialog('/addFavorites', [
     
     function (session: builder.Session, results: builder.IPromptChoiceResult, next: any)
     {
-        if (results.response.index == 0) // want to add another location
+        if (results.response && results.response.index == 0) // want to add another location
         {
             session.replaceDialog('/addFavorites')
         }
-        else if (results.response.index == 1) // do not want to add another 
+        else if (results.response && results.response.index == 1) // do not want to add another 
         {
             session.endDialog("Okay, updating your account!");
         }
@@ -2504,7 +2534,7 @@ bot.dialog('/removeFavorites', [
         let favoriteLocations: any = session.userData.favoriteLocations
         for (let key in favoriteLocations)
         {
-            if (key == results.response.entity)
+            if (results.response && key == results.response.entity)
             {
                 delete favoriteLocations[key]
             }
@@ -2571,7 +2601,7 @@ bot.dialog('/login', [
     },
     (session: builder.Session, results: builder.IPromptChoiceResult, next: any) =>
     {
-        if (results.response.index == 0) // yes, try again
+        if (results.response && results.response.index == 0) // yes, try again
         {
             session.replaceDialog('/login');
         }
@@ -2606,11 +2636,11 @@ bot.dialog('/edit', [
     }
     (session: builder.Session, results: builder.IPromptChoiceResult, next: any) =>
     {
-        if (results.response.index == 0) // remove favorites
+        if (results.response && results.response.index == 0) // remove favorites
         {
             session.beginDialog('/removeFavorites');
         }
-        else if (results.response.index == 1) // add favorites
+        else if (results.response && results.response.index == 1) // add favorites
         {
             session.beginDialog('/addFavorites');
         }

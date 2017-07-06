@@ -6,7 +6,7 @@ const process = require("process");
 var server = restify.createServer();
 var azure = require('azure-storage');
 var botbuilder_azure = require("botbuilder-azure");
-var locationDialog = require("botbuilder-location");
+var map_builder = require("./map_builder")
 
 var server = restify.createServer();
 server.listen(process.env.port || process.env.PORT || 3979, function () {
@@ -24,30 +24,20 @@ var bot = new builder.UniversalBot(connector).set('storage', UserTable);
 var entGen = azure.TableUtilities.entityGenerator;
 var time = Date.now();
 var now = time.toString();
-bot.library(locationDialog.createLibrary("Ag2_gxEa3qcbVGAeEqKMcPptES--_GKGXIFi5TJl8Z2kuGF5BVxIXuVn3LIkdGSr"));
 
 
 bot.dialog("/", [
     (session) =>
     {
-        locationDialog.getLocation(session, 
-        {
-            prompt: "What is your starting location?",
-            useNativeControl: false
-        });
-    },
+        var map = map_builder.map_card_builder(session, 32.7767, -96.7970)
+        map.text("Hello World!")
+        session.send(map);
+
+        builder.Prompts.text(session, "What is up");
+    }, 
     (session, results) =>
     {
-        if (results.response)
-        {
-            console.log(results)
-            session.send("Okay we got it!");
-        }
-        else
-        {
-            console.log(results);
-            session.send("We are done!")
-        }
+        session.send(results.response);
     }
 ])
 

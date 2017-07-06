@@ -10,6 +10,7 @@ import * as process from "process";
 import * as path from "path";
 import * as botbuilder_azure from "botbuilder-azure";
 import * as azureStorage from 'azure-storage';
+import * as map_builder from "./map_builder";
 
 //=========================================================
 // Google Maps Configure
@@ -196,7 +197,6 @@ bot.dialog("/help", [
 })
 bot.beginDialogAction("repeatOptions", "/options", {})
 bot.beginDialogAction("endConversation", "/end")
-
 //=========================================================
 // Bots Dialogs
 //=========================================================
@@ -234,7 +234,272 @@ bot.dialog('/main', [
     function (session: builder.Session, args: any, next: any): void
     {
         session.send("Great! We just need a few details to get you to your destination! You can say 'cancel' or 'restart' to redo your current step.");
-        session.replaceDialog("/preferences");
+
+        // Check to see if they are a registered user
+        // If a known user with favorites launch the favorites dialog 
+        if (session.userData.favoriteLocations)
+        {
+            console.log("Starting /favoriteLocations");
+            session.replaceDialog("/favoriteLocations");
+        }
+        // if the user does not have favorites 
+        else
+        {
+            console.log("Starting /customLocations");
+            session.replaceDialog("/customLocations");
+        }
+        
+    }
+])
+
+bot.dialog("/favoriteLocations", [
+
+    // get the user's starting location
+    function(session: builder.Session): void
+    {   
+        let locationChoice: string[] = ["Custom"]
+        if (session.userData.phone && session.userData.pin)
+        {
+            let favoriteLocations = session.userData.favoriteLocations;
+            
+            for (let key in favoriteLocations)
+            {
+                locationChoice.push(key)
+            }
+            
+        }
+        builder.Prompts.choice(session, "You can enter a custom address or select one of your favorites", locationChoice);
+    },
+    (session: builder.Session, results: builder.IPromptChoiceResult, next: any) =>
+    {
+        if (results.response)
+        {
+            if (results.response.index == 0) // if the user wants a custom location
+            {
+                builder.Prompts.text(session, "What is your starting location? (E.g. 22nd and Main Austin Texas or JKF Airport)");
+            }
+            else
+            {
+                // Find the key's pair 
+                let favoriteLocations = session.userData.favoriteLocations;
+                for (let key in favoriteLocations)
+                {
+                    if (key == results.response.entity)
+                    {
+                        session.privateConversationData.start = favoriteLocations[key];
+                        next();
+                    }
+                }
+            }
+        }
+    },
+    (session: builder.Session, results: builder.IPromptChoiceResult, next: any)  =>
+    {
+        // Check to see if the information has been recieved
+        if (results.response)
+        {
+            session.privateConversationData.start = results.response;
+        }
+
+        // set the starting lat and long 
+        // call the google maps function to get the session.privateConversationData 
+        googleMapsClient.geocode({ address: session.privateConversationData.start}, function (err, response): void
+        {
+            if (!err)
+            {   
+                // Get and save the latitude
+                session.privateConversationData.start_lat = response.json.results[0].geometry.location.lat
+
+                // get the longitude
+                session.privateConversationData.start_long = response.json.results[0].geometry.location.lng
+                
+                // send the location image in a message 
+                console.log("Building the location message");
+                let locationMessage: builder.Message = map_builder.map_card_builder(session, 
+                response.json.results[0].geometry.location.lat, 
+                response.json.results[0].geometry.location.lng);
+                locationMessage.text("Here is your starting location. Say 'restart' to re-enter");
+
+                console.log("Sending the location image message");
+                session.send(locationMessage);
+                
+                console.log("Asking for destination");
+                let locationChoice: string[] = ["Custom"]
+                if (session.userData.phone && session.userData.pin)
+                {
+                    let favoriteLocations = session.userData.favoriteLocations;
+                    
+                    for (let key in favoriteLocations)
+                    {
+                        locationChoice.push(key)
+                    } 
+                }
+                builder.Prompts.choice(session, "Gerat! For your destination, you can enter a customer address or select one of your favorites", locationChoice); 
+            }
+            // if there is an error 
+            else 
+            {
+                // Call the error dialogue
+                console.log("There was an error getting your starting location");
+            }
+        })
+
+         
+    },
+
+    (session: builder.Session, results: builder.IPromptChoiceResult, next: any) =>
+    {
+        if (results.response)
+        {
+            if (results.response.index == 0) // if the user wants a custom location
+            {
+                builder.Prompts.text(session, "What is your destination? (E.g. 1600 Pennsylvania Avenue  or The Space Needle)");
+            }
+            else
+            {
+                // Find the key's pair 
+                let favoriteLocations = session.userData.favoriteLocations;
+                for (let key in favoriteLocations)
+                {
+                    if (key == results.response.entity)
+                    {
+                        session.privateConversationData.end = favoriteLocations[key];
+                        next();
+                    }
+                }
+            }
+        }
+    },
+    (session: builder.Session, results: builder.IPromptChoiceResult, next: any)  =>
+    {
+        // Check to see if the information has been recieved
+        if (results.response)
+        {
+            session.privateConversationData.end = results.response;
+        }
+
+        // Get and set the lat and long for the destiation
+        googleMapsClient.geocode({address: session.privateConversationData.end}, function (err, response)
+        {
+            if (!err)
+            {
+                // get the latitutde
+                session.privateConversationData.end_lat = response.json.results[0].geometry.location.lat;
+
+                // get the longitude
+                session.privateConversationData.end_long = response.json.results[0].geometry.location.lng;
+
+                // send the location image in a message 
+                let locationMessage: builder.Message = map_builder.map_card_builder(session, 
+                response.json.results[0].geometry.location.lat, 
+                response.json.results[0].geometry.location.lng);
+
+                locationMessage.text("Here is your destination. Say 'restart' to re enter");
+
+                session.send(locationMessage);
+                
+                // Start the next dialog
+                session.beginDialog("/preferences");
+            }
+
+            // If there is an error
+            else
+            {
+                // call the error dialogue
+                // Unable to determine location
+                console.log("There was an error in getting destination");
+            }
+        })
+
+    }
+]).reloadAction("reloadLocations", "Getting your location again", {
+    matches: [/^restart/i, /^start over/i, /^redo/i]
+})
+
+bot.dialog('/customLocations', [
+    (session: builder.Session) =>
+    {
+        builder.Prompts.text(session, "What is your starting location? (E.g. 22nd and Main Austin Texas or JKF Airport)");
+    }, 
+    (session: builder.Session, results: builder.IPromptTextResult, next: any) =>
+    {
+        // Check to see if the information has been recieved
+        if (results.response)
+        {
+            session.privateConversationData.start = results.response;
+        }
+
+        // set the starting lat and long 
+        // call the google maps function to get the session.privateConversationData 
+        googleMapsClient.geocode({ address: session.privateConversationData.start}, function (err, response): void
+        {
+            if (!err)
+            {   
+                // Get and save the latitude
+                session.privateConversationData.start_lat = response.json.results[0].geometry.location.lat
+
+                // get the longitude
+                session.privateConversationData.start_long = response.json.results[0].geometry.location.lng
+
+                // send the location image in a message 
+                let locationMessage: builder.Message = map_builder.map_card_builder(session, 
+                response.json.results[0].geometry.location.lat, 
+                response.json.results[0].geometry.location.lng);
+                locationMessage.text("Here is your starting location. Say 'restart' to re enter");
+
+                session.send(locationMessage);
+                console.log("Asking for destination");
+                
+                builder.Prompts.text(session, "What is your destination? (E.g. 1600 Pennsylvania Avenue  or The Space Needle)"); 
+            }
+            // if there is an error 
+            else 
+            {
+                // Call the error dialogue
+                console.log("There was an error getting your starting location");
+            }
+        })
+    }, 
+    (session: builder.Session, results: builder.IPromptTextResult, next: any) =>
+    {
+        // Check to see if the information has been recieved
+        if (results.response)
+        {
+            session.privateConversationData.end = results.response;
+        }
+
+        // Get and set the lat and long for the destiation
+        googleMapsClient.geocode({address: session.privateConversationData.end}, function (err, response)
+        {
+            if (!err)
+            {
+                // get the latitutde
+                session.privateConversationData.end_lat = response.json.results[0].geometry.location.lat;
+
+                // get the longitude
+                session.privateConversationData.end_long = response.json.results[0].geometry.location.lng;
+
+                // send the location image in a message 
+                let locationMessage: builder.Message = map_builder.map_card_builder(session, 
+                response.json.results[0].geometry.location.lat, 
+                response.json.results[0].geometry.location.lng);
+
+                locationMessage.text("Here is your destination. Say 'restart' to re enter");
+
+                session.send(locationMessage);
+                
+                // Start the next dialog
+                session.beginDialog("/preferences");
+            }
+
+            // If there is an error
+            else
+            {
+                // call the error dialogue
+                // Unable to determine location
+                console.log("There was an error in getting destination");
+            }
+        });
     }
 ])
 
@@ -296,7 +561,7 @@ bot.dialog('/preferences', [
         }
 
         // Go to the next step
-        session.replaceDialog('/locations');
+        session.replaceDialog('/calculation');
     }
 
     
@@ -304,150 +569,7 @@ bot.dialog('/preferences', [
     matches: [/^restart/i, /^start over/i]
 })
 
-bot.dialog("/locations", [
 
-    // get the user's starting location
-    function(session: builder.Session): void
-    {   
-        let locationChoice: string[] = ["Custom"]
-        if (session.userData.phone && session.userData.pin)
-        {
-            let favoriteLocations = session.userData.favoriteLocations;
-            
-            for (let key in favoriteLocations)
-            {
-                locationChoice.push(key)
-            }
-            
-        }
-        builder.Prompts.choice(session, "You can enter a customer address or select one of your favorites", locationChoice);
-    },
-    (session: builder.Session, results: builder.IPromptChoiceResult, next: any) =>
-    {
-        if (results.response)
-        {
-            if (results.response.index == 0) // if the user wants a custom location
-            {
-                builder.Prompts.text(session, "What is your starting location? (E.g. 22nd and Main Austin Texas or JKF Airport)");
-            }
-            else
-            {
-                // Find the key's pair 
-                let favoriteLocations = session.userData.favoriteLocations;
-                for (let key in favoriteLocations)
-                {
-                    if (key == results.response.entity)
-                    {
-                        session.privateConversationData.start = favoriteLocations[key];
-                        next();
-                    }
-                }
-            }
-        }
-    },
-    (session: builder.Session, results: builder.IPromptChoiceResult, next: any)  =>
-    {
-        // Check to see if the information has been recieved
-        if (results.response)
-        {
-            session.privateConversationData.start = results.response;
-        }
-
-        // set the starting lat and long 
-        // call the google maps function to get the session.privateConversationData 
-        googleMapsClient.geocode({ address: session.privateConversationData.start}, function (err, response): void
-        {
-            if (!err)
-            {   
-                // Get and save the latitude
-                session.privateConversationData.start_lat = response.json.results[0].geometry.location.lat
-
-                // get the longitude
-                session.privateConversationData.start_long = response.json.results[0].geometry.location.lng
-                
-                console.log("Asking for destination");
-                let locationChoice: string[] = ["Custom"]
-                if (session.userData.phone && session.userData.pin)
-                {
-                    let favoriteLocations = session.userData.favoriteLocations;
-                    
-                    for (let key in favoriteLocations)
-                    {
-                        locationChoice.push(key)
-                    } 
-                }
-                builder.Prompts.choice(session, "You can enter a customer address or select one of your favorites", locationChoice); 
-            }
-            // if there is an error 
-            else 
-            {
-                // Call the error dialogue
-                console.log("There was an error getting your starting location");
-            }
-        })
-
-         
-    },
-
-    (session: builder.Session, results: builder.IPromptChoiceResult, next: any) =>
-    {
-        if (results.response)
-        {
-            if (results.response.index == 0) // if the user wants a custom location
-            {
-                builder.Prompts.text(session, "What is your destination? (E.g. 1600 Pennsylvania Avenue  or The Space Needle)");
-            }
-            else
-            {
-                // Find the key's pair 
-                let favoriteLocations = session.userData.favoriteLocations;
-                for (let key in favoriteLocations)
-                {
-                    if (key == results.response.entity)
-                    {
-                        session.privateConversationData.end = favoriteLocations[key];
-                        next();
-                    }
-                }
-            }
-        }
-    },
-    (session: builder.Session, results: builder.IPromptChoiceResult, next: any)  =>
-    {
-        // Check to see if the information has been recieved
-        if (results.response)
-        {
-            session.privateConversationData.end = results.response;
-        }
-
-        // Get and set the lat and long for the destiation
-        googleMapsClient.geocode({address: session.privateConversationData.end}, function (err, response)
-        {
-            if (!err)
-            {
-                // get the latitutde
-                session.privateConversationData.end_lat = response.json.results[0].geometry.location.lat;
-
-                // get the longitude
-                session.privateConversationData.end_long = response.json.results[0].geometry.location.lng;
-
-                // Start the next dialog
-                session.beginDialog("/calculation");
-            }
-
-            // If there is an error
-            else
-            {
-                // call the error dialogue
-                // Unable to determine location
-                console.log("There was an error in getting destination");
-            }
-        })
-
-    }
-]).reloadAction("reloadLocations", "Getting your location again", {
-    matches: [/^restart/i, /^start over/i]
-})
 
 bot.dialog('/calculation',[
 //=========================================================
@@ -541,33 +663,15 @@ bot.dialog('/calculation',[
                 
         }
 
-        let MainUrl: string = "https://maps.googleapis.com/maps/api/staticmap?";
-
-        let Key: string = "&key=AIzaSyDQmIfhoqmGszLRkinJi7mD7SEWt2bQFv8";
-
-        // Set the constants
-        let Size: string = "&size=640x640";
-
-        let Format: string = "&format=png";
-
-        let MarkerStyleStart: string = "&markers=color:red|label:A|" + start_lat + "," + start_long;  
-
-        let MarkerStyleEnd: string = "&markers=color:red|label:B|" + end_lat + "," + end_long; 
-
-        let Path: string = "&path=color:blue|" + start_lat + "," + start_long + "|" + end_lat + "," + end_long;
-
-        let Query: string = MainUrl + Size + Format + MarkerStyleStart + MarkerStyleEnd + Path + Key; 
-
-        session.send("Here is a map of your locations");
-
-        // Build the new message 
-        var msg = new builder.Message(session).attachments([{
-            contentType: "image/png",
-            contentUrl: Query
-        }]);
+        // Build the message for the locations
+        let message = new builder.Message(session)
+            .attachments([{
+                contentType: "image/png",
+                contentUrl: map_builder.map_image_route_builder(start_lat, start_long, end_lat, end_long)}])
+            .text("Here is a map of you locations!");
 
         // Send the message
-        session.send(msg);
+        session.send(message);
 
         // Log step to console
         console.log("Getting Google Transit informaiton")
@@ -1438,7 +1542,9 @@ bot.dialog('/calculation',[
 //=========================================================
 // Car2Go information 
 //=========================================================
-
+//=========================================================
+// End of Calculations
+//=========================================================
 
         console.log("Finished");
         function Timeout(transit: boolean, uber: boolean, lyft: boolean, next: Function) {
@@ -2462,8 +2568,26 @@ bot.dialog('/addFavorites', [
 
     function (session: builder.Session, results: builder.IPromptTextResult, next: any)
     {
+        // save the data
         session.dialogData.tempFavoriteLocationAddress = results.response;
-        builder.Prompts.choice(session, `You said your location name was '${session.dialogData.tempFavoriteLocationName}' and the address was '${results.response}.' Is that correct?`, ["Yes", "No"]);
+
+        // send an image of the correct location and verify
+        // get the geocode
+        googleMapsClient.geocode({ address: session.privateConversationData.start}, function (err, response)
+        {
+            // get the latitutde
+            let lat = response.json.results[0].geometry.location.lat;
+
+            // get the longitude
+            let long = response.json.results[0].geometry.location.lng;
+        
+            let mapMessage: builder.Message = map_builder.map_card_builder(session, lat, long)
+            mapMessage.text("Is this the correct information?")
+
+            builder.Prompts.choice(session, `You said your location name was '${session.dialogData.tempFavoriteLocationName}' and the address was '${results.response}.' Is that correct?`, ["Yes", "No"]);
+
+
+        })
     },
     function(session: builder.Session, results: builder.IPromptChoiceResult, next: any)
     {
@@ -2633,7 +2757,7 @@ bot.dialog('/edit', [
     (session: builder.Session, results: builder.IPromptChoiceResult, next: any) =>
     {
         builder.Prompts.choice(session,"Awesome, we have your info. What would you like to do next?", ["Remove Favorites", "Add Favorites", "Cancel"])
-    }
+    },
     (session: builder.Session, results: builder.IPromptChoiceResult, next: any) =>
     {
         if (results.response && results.response.index == 0) // remove favorites

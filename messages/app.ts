@@ -286,7 +286,10 @@ bot.dialog("/favoriteLocations", [
                 {
                     if (key == results.response.entity)
                     {
-                        session.privateConversationData.start = favoriteLocations[key];
+                        // set the user's start, start lat, and start long converstation data 
+                        session.privateConversationData.start = favoriteLocations[key].address;
+                        session.privateConversationData.start_lat = favoriteLocations[key].lat;
+                        session.privateConversationData.start_long = favoriteLocations[key].long;
                         next();
                     }
                 }
@@ -296,54 +299,56 @@ bot.dialog("/favoriteLocations", [
     (session: builder.Session, results: builder.IPromptChoiceResult, next: any)  =>
     {
         // Check to see if the information has been recieved
+        // The user chose a custom address
         if (results.response)
         {
+            console.log("Adding the information for custom information.")
+            // set the start address name
             session.privateConversationData.start = results.response;
+
+            // set the starting lat and long 
+            // call the google maps function to get the session.privateConversationData 
+            googleMapsClient.geocode({ address: session.privateConversationData.start}, function (err, response): void
+            {
+                if (!err)
+                {   
+                    // Get and save the latitude
+                    session.privateConversationData.start_lat = response.json.results[0].geometry.location.lat
+
+                    // get the longitude
+                    session.privateConversationData.start_long = response.json.results[0].geometry.location.lng
+                    
+                    // send the location image in a message 
+                    console.log("Building the location message");
+                    let locationMessage: builder.Message = map_builder.map_card_builder(session, 
+                    response.json.results[0].geometry.location.lat, 
+                    response.json.results[0].geometry.location.lng);
+                    locationMessage.text("Here is your starting location. Say 'restart' to re-enter");
+
+                    console.log("Sending the location image message");
+                    session.send(locationMessage); 
+                }
+                // if there is an error 
+                else 
+                {
+                    // Call the error dialogue
+                    console.log("There was an error getting your starting location");
+                }
+            })
         }
 
-        // set the starting lat and long 
-        // call the google maps function to get the session.privateConversationData 
-        googleMapsClient.geocode({ address: session.privateConversationData.start}, function (err, response): void
+        console.log("Asking for destination");
+        let locationChoice: string[] = ["Custom"]
+        if (session.userData.phone && session.userData.pin)
         {
-            if (!err)
-            {   
-                // Get and save the latitude
-                session.privateConversationData.start_lat = response.json.results[0].geometry.location.lat
-
-                // get the longitude
-                session.privateConversationData.start_long = response.json.results[0].geometry.location.lng
-                
-                // send the location image in a message 
-                console.log("Building the location message");
-                let locationMessage: builder.Message = map_builder.map_card_builder(session, 
-                response.json.results[0].geometry.location.lat, 
-                response.json.results[0].geometry.location.lng);
-                locationMessage.text("Here is your starting location. Say 'restart' to re-enter");
-
-                console.log("Sending the location image message");
-                session.send(locationMessage);
-                
-                console.log("Asking for destination");
-                let locationChoice: string[] = ["Custom"]
-                if (session.userData.phone && session.userData.pin)
-                {
-                    let favoriteLocations = session.userData.favoriteLocations;
-                    
-                    for (let key in favoriteLocations)
-                    {
-                        locationChoice.push(key)
-                    } 
-                }
-                builder.Prompts.choice(session, "Gerat! For your destination, you can enter a customer address or select one of your favorites", locationChoice); 
-            }
-            // if there is an error 
-            else 
+            let favoriteLocations = session.userData.favoriteLocations;
+            
+            for (let key in favoriteLocations)
             {
-                // Call the error dialogue
-                console.log("There was an error getting your starting location");
-            }
-        })
-
+                locationChoice.push(key)
+            } 
+        }
+        builder.Prompts.choice(session, "Great! For your destination, you can enter a customer address or select one of your favorites", locationChoice);
          
     },
 
@@ -363,7 +368,10 @@ bot.dialog("/favoriteLocations", [
                 {
                     if (key == results.response.entity)
                     {
-                        session.privateConversationData.end = favoriteLocations[key];
+                        // set the user's end, end lat, and end long converstation data 
+                        session.privateConversationData.end = favoriteLocations[key].address;
+                        session.privateConversationData.end_lat = favoriteLocations[key].lat;
+                        session.privateConversationData.end_long = favoriteLocations[key].long;
                         next();
                     }
                 }
@@ -376,41 +384,40 @@ bot.dialog("/favoriteLocations", [
         if (results.response)
         {
             session.privateConversationData.end = results.response;
+
+            // Get and set the lat and long for the destiation
+            googleMapsClient.geocode({address: session.privateConversationData.end}, function (err, response)
+            {
+                if (!err)
+                {
+                    // get the latitutde
+                    session.privateConversationData.end_lat = response.json.results[0].geometry.location.lat;
+
+                    // get the longitude
+                    session.privateConversationData.end_long = response.json.results[0].geometry.location.lng;
+
+                    // send the location image in a message 
+                    let locationMessage: builder.Message = map_builder.map_card_builder(session, 
+                    response.json.results[0].geometry.location.lat, 
+                    response.json.results[0].geometry.location.lng);
+
+                    locationMessage.text("Here is your destination. Say 'restart' to re enter");
+
+                    session.send(locationMessage);
+                    
+                    // Start the next dialog
+                    session.beginDialog("/preferences");
+                }
+
+                // If there is an error
+                else
+                {
+                    // call the error dialogue
+                    // Unable to determine location
+                    console.log("There was an error in getting destination");
+                }
+            })
         }
-
-        // Get and set the lat and long for the destiation
-        googleMapsClient.geocode({address: session.privateConversationData.end}, function (err, response)
-        {
-            if (!err)
-            {
-                // get the latitutde
-                session.privateConversationData.end_lat = response.json.results[0].geometry.location.lat;
-
-                // get the longitude
-                session.privateConversationData.end_long = response.json.results[0].geometry.location.lng;
-
-                // send the location image in a message 
-                let locationMessage: builder.Message = map_builder.map_card_builder(session, 
-                response.json.results[0].geometry.location.lat, 
-                response.json.results[0].geometry.location.lng);
-
-                locationMessage.text("Here is your destination. Say 'restart' to re enter");
-
-                session.send(locationMessage);
-                
-                // Start the next dialog
-                session.beginDialog("/preferences");
-            }
-
-            // If there is an error
-            else
-            {
-                // call the error dialogue
-                // Unable to determine location
-                console.log("There was an error in getting destination");
-            }
-        })
-
     }
 ]).reloadAction("reloadLocations", "Getting your location again", {
     matches: [/^restart/i, /^start over/i, /^redo/i]
@@ -2515,7 +2522,7 @@ bot.dialog('/signUp', [
             let locationsObject = session.userData.favoriteLocations
             for (let key in locationsObject)
             {
-                FavoriteLocations[key.toString()] = locationsObject[key.toString()]
+                FavoriteLocations[key] = locationsObject[key]
             }
         }
 
@@ -2577,12 +2584,15 @@ bot.dialog('/addFavorites', [
         {
             // get the latitutde
             let lat = response.json.results[0].geometry.location.lat;
+            session.dialogData.lat = response.json.results[0].geometry.location.lat;
 
             // get the longitude
             let long = response.json.results[0].geometry.location.lng;
+            session.dialogData.long = response.json.results[0].geometry.location.lng;
         
             let mapMessage: builder.Message = map_builder.map_card_builder(session, lat, long)
             mapMessage.text("Is this the correct information?")
+            session.send(mapMessage);
 
             builder.Prompts.choice(session, `You said your location name was '${session.dialogData.tempFavoriteLocationName}' and the address was '${results.response}.' Is that correct?`, ["Yes", "No"]);
 
@@ -2603,8 +2613,12 @@ bot.dialog('/addFavorites', [
             {
                 console.log("There are no favorite locations");
                 let FavoriteLocation = {};
-
-                FavoriteLocation[tempFavoriteLocationName] = tempFavoriteLocationAddress
+                FavoriteLocation[tempFavoriteLocationName] = 
+                {
+                    "address": tempFavoriteLocationAddress,
+                    "lat": session.dialogData.lat,
+                    "long": session.dialogData.long 
+                }
                 
                 // Add the location to the favorite
                 session.userData.favoriteLocations = FavoriteLocation;

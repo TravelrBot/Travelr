@@ -10,7 +10,6 @@ var botbuilder_azure = require("botbuilder-azure");
 var azureStorage = require('azure-storage');
 var map_builder = require('./map_builder')
 
-
 //=========================================================
 // Google Maps Configure
 //=========================================================

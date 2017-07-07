@@ -6,7 +6,10 @@ var request = require("request");
 var googleMaps = require("@google/maps");
 var process = require("process");
 var path = require("path");
-const botbuilder_azure = require("botbuilder-azure");
+var botbuilder_azure = require("botbuilder-azure");
+var azureStorage = require('azure-storage');
+var map_builder = require('./map_builder')
+
 
 //=========================================================
 // Google Maps Configure

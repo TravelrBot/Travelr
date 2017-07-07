@@ -257,17 +257,35 @@ bot.dialog("/favoriteLocations", [
     // get the user's starting location
     function(session: builder.Session): void
     {   
+        // Create a list of buttons for the favorites options
         let locationChoice: string[] = ["Custom"]
+
+        // build the base location message for the favorites maps
+        let locationMessage: builder.Message = new builder.Message(session)
+            .attachmentLayout(builder.AttachmentLayout.carousel)
+            .addAttachment(new builder.HeroCard(session)
+                .title("Custom")
+        )
         if (session.userData.phone && session.userData.pin)
         {
             let favoriteLocations = session.userData.favoriteLocations;
             
             for (let key in favoriteLocations)
             {
+                // Add the key to the list of options
                 locationChoice.push(key)
+
+                // add an attachment to the hero card carousel
+                locationMessage
+                    .addAttachment(new builder.HeroCard(session)
+                        .title(key)
+                        .images([builder.CardImage.create(session, 
+                            map_builder.map_image_location_builder(favoriteLocations[key].lat, 
+                                favoriteLocations[key].long))]))
             }
             
         }
+        session.send(locationMessage);
         builder.Prompts.choice(session, "You can enter a custom address or select one of your favorites", locationChoice);
     },
     (session: builder.Session, results: builder.IPromptChoiceResult, next: any) =>
@@ -323,7 +341,7 @@ bot.dialog("/favoriteLocations", [
                     let locationMessage: builder.Message = map_builder.map_card_builder(session, 
                     response.json.results[0].geometry.location.lat, 
                     response.json.results[0].geometry.location.lng);
-                    locationMessage.text("Here is your starting location. Say 'restart' to re-enter");
+                    locationMessage.text("Here is your custom starting location. You can say say 'restart' to re-enter if it is wrong");
 
                     console.log("Sending the location image message");
                     session.send(locationMessage); 
@@ -339,15 +357,31 @@ bot.dialog("/favoriteLocations", [
 
         console.log("Asking for destination");
         let locationChoice: string[] = ["Custom"]
-        if (session.userData.phone && session.userData.pin)
+
+        // build the base location message for the favorites maps
+        let locationMessage: builder.Message = new builder.Message(session)
+            .attachmentLayout(builder.AttachmentLayout.carousel)
+            .addAttachment(new builder.HeroCard(session)
+                .title("Custom")
+        )
+        
+        //  Get the favorite locations
+        let favoriteLocations = session.userData.favoriteLocations;
+        
+        // loop through each location and build out the buttons and hero card images
+        for (let key in favoriteLocations)
         {
-            let favoriteLocations = session.userData.favoriteLocations;
-            
-            for (let key in favoriteLocations)
-            {
-                locationChoice.push(key)
-            } 
-        }
+            locationChoice.push(key)
+
+            // add an attachment to the hero card carousel
+                locationMessage
+                    .addAttachment(new builder.HeroCard(session)
+                        .title(key)
+                        .images([builder.CardImage.create(session, 
+                            map_builder.map_image_location_builder(favoriteLocations[key].lat, 
+                                favoriteLocations[key].long))]))
+        } 
+        session.send(locationMessage);
         builder.Prompts.choice(session, "Great! For your destination, you can enter a customer address or select one of your favorites", locationChoice);
          
     },
@@ -418,6 +452,9 @@ bot.dialog("/favoriteLocations", [
                 }
             })
         }
+
+        // Start the next dialog if a favorite was chosen
+        session.beginDialog("/preferences");
     }
 ]).reloadAction("reloadLocations", "Getting your location again", {
     matches: [/^restart/i, /^start over/i, /^redo/i]
@@ -2513,17 +2550,12 @@ bot.dialog('/signUp', [
         // build the account
         
         // Check to see if favorite locations have been added 
-        let FavoriteLocations = 
+        let FavoriteLocations = session.userData.favoriteLocations;
+
+        // Determine if undefined
+        if (!FavoriteLocations)
         {
-            
-        };
-        if (session.userData.favoriteLocations)
-        {
-            let locationsObject = session.userData.favoriteLocations
-            for (let key in locationsObject)
-            {
-                FavoriteLocations[key] = locationsObject[key]
-            }
+            FavoriteLocations = {};
         }
 
         var VisitedLocations = 
@@ -2580,7 +2612,7 @@ bot.dialog('/addFavorites', [
 
         // send an image of the correct location and verify
         // get the geocode
-        googleMapsClient.geocode({ address: session.privateConversationData.start}, function (err, response)
+        googleMapsClient.geocode({ address: results.response}, function (err, response)
         {
             // get the latitutde
             let lat = response.json.results[0].geometry.location.lat;
@@ -2589,10 +2621,12 @@ bot.dialog('/addFavorites', [
             // get the longitude
             let long = response.json.results[0].geometry.location.lng;
             session.dialogData.long = response.json.results[0].geometry.location.lng;
-        
+            
+            
             let mapMessage: builder.Message = map_builder.map_card_builder(session, lat, long)
             mapMessage.text("Is this the correct information?")
             session.send(mapMessage);
+            
 
             builder.Prompts.choice(session, `You said your location name was '${session.dialogData.tempFavoriteLocationName}' and the address was '${results.response}.' Is that correct?`, ["Yes", "No"]);
 
@@ -2626,7 +2660,14 @@ bot.dialog('/addFavorites', [
             else // if the data exists
             {
                 console.log("Add a new favorite location");
-                FavoriteLocation[tempFavoriteLocationName] = tempFavoriteLocationAddress;
+                
+                // Add the information about the location
+                FavoriteLocation[tempFavoriteLocationName] = 
+                {
+                    "address": tempFavoriteLocationAddress,
+                    "lat": session.dialogData.lat,
+                    "long": session.dialogData.long 
+                }
                 session.userData.favoriteLocations = FavoriteLocation;
             }
 

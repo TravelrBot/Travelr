@@ -29,15 +29,25 @@ var now = time.toString();
 bot.dialog("/", [
     (session) =>
     {
-        var map = map_builder.map_card_builder(session, 32.7767, -96.7970)
-        map.text("Hello World!")
-        session.send(map);
-
-        builder.Prompts.text(session, "What is up");
-    }, 
-    (session, results) =>
+        session.send(new builder.Message(session)
+            .attachmentLayout(builder.AttachmentLayout.carousel)
+            .addAttachment(new builder.HeroCard(session)
+                .images([new builder.CardImage.create(session, map_builder.map_image_location_builder(32.7767, -96.7970))])
+                .title("Dallas")
+                .text("Hello from Dallas!")
+                .buttons([new builder.CardAction.imBack(session, "Dallas", "Dallas")]))
+            .addAttachment(new builder.HeroCard(session)
+                .images([new builder.CardImage.create(session, map_builder.map_image_location_builder(30.2672, -97.7431))])
+                .title("Austin"))
+            .addAttachment(new builder.HeroCard(session)
+                .images([new builder.CardImage.create(session, map_builder.map_image_location_builder(39.7392, -104.9903))])
+                .title("Denver"))
+        )
+    },
+    (session, results, next) =>
     {
-        session.send(results.response);
+        console.log(results);
+        session.send("You picked!")
     }
 ])
 

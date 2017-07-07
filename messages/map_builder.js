@@ -22,7 +22,7 @@ function map_image_location_builder(lat, long) {
 }
 function map_card_builder(session, lat, long) {
     var message = new builder.Message(session)
-        .attachmentLayout(builder.AttachmentLayout.carousel)
+        .attachmentLayout(builder.AttachmentLayout.list)
         .addAttachment(new builder.HeroCard(session)
         .images([new builder.CardImage(session)
             .url(map_image_location_builder(lat, long))]));

@@ -16,9 +16,11 @@
     "azure-storage": "^2.1.0",
     "botbuilder": "^3.8.4",
     "botbuilder-azure": "^3.0.2",
+    "botbuilder-location": "^2.0.0",
     "node-uber": "^1.0.0",
     "request": "^2.81.0",
     "restify": "^4.3.0",
-    "tsc": "^1.20150623.0"
+    "tsc": "^1.20150623.0",
+    "typescript": "^2.4.1"
   }
 }

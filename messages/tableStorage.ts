@@ -1,39 +1,53 @@
 import * as azure from 'azure-storage';
 
-
-async function TableSeed() 
+function TableSeed() 
 {
+    
     let tableService: azure.TableService = azure.createTableService('DefaultEndpointsProtocol=https;AccountName=travelrbotc4g2ai;AccountKey=cL2Xq/C6MW2ihDet27iU8440FFj1KU0K0TIo1QnYJ3gvyWQ4cn6LysyZInjE0jdeTW75zBTAgTbmkDriNlky0g==;EndpointSuffix=core.windows.net');
 
-    await tableService.createTable("CustomerInfo", (error, result, response) => 
+    tableService.createTableIfNotExists("Rideshare", (error, result, response) => 
     {
-        console.log(`Table ${result.TableName}'s creation was successful: ${result.created}`);
+        if (error)
+        {   
+            console.log("There was an error creating Rideshare table");
+            console.log(error)
+        }
+        else
+        {
+            console.log(`The ${result.TableName} table creation is: ${result.isSuccessful}`)
+        }
     });
 
-    let entGen = azure.TableUtilities.entityGenerator;
-
-    let person = 
+    tableService.createTableIfNotExists("Carshare", (error, result, response) => 
     {
-        PartitionKey: entGen.String('User'),
-        RowKey: entGen.String('1'),
-        Uber: 
-        {
-            ride: "Uberx",
-            price: 22,
-            distance: 5
+        if (error)
+        {   
+            console.log("There was an error creating Carshare table");
+            console.log(error)
         }
-    }
+        else
+        {
+            console.log(`The ${result.TableName} table creation is: ${result.isSuccessful}`)
+        }
+    });
+}
 
-    await tableService.insertEntity("CustomerInfo", person, (error, result, response) =>
+/*
+    tableService.insertEntity("CustomerInfo", person, (error, result, response) =>
     {
         if (!error)
-        {
+        {   
+            console.log("Person added to Table: ")
             console.log(response.isSuccessful);
         }
-    })
+        else
+        {
+            console.log("There was an error: \n")
+            console.log(error);
+        }
+    });
 
-    console.log("Finished table");
-}
+
 
 function Retrieve()
 {
@@ -49,3 +63,8 @@ function Retrieve()
         console.log(result.entries);
     }) 
 }
+
+*/
+
+
+TableSeed();

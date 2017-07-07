@@ -25,8 +25,6 @@ let googleMapsClient: any = googleMaps.createClient({
 //=========================================================
 let useEmulator: boolean = (process.env.NODE_ENV == 'development');
 
-useEmulator = true;
-
 let connector: any = useEmulator ? new builder.ChatConnector() : new botbuilder_azure.BotServiceConnector({
     appId: process.env['MicrosoftAppId'],
     appPassword: process.env['MicrosoftAppPassword'],

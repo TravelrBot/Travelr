@@ -11,7 +11,10 @@ import * as path from "path";
 import * as botbuilder_azure from "botbuilder-azure";
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> development
 =======
 >>>>>>> development
 import * as azureStorage from 'azure-storage';
@@ -21,6 +24,9 @@ import * as map_builder from "./map_builder";
 // Google Maps Configure
 //=========================================================
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> development
+=======
 >>>>>>> development
 =======
 >>>>>>> development
@@ -36,11 +42,16 @@ let useEmulator: boolean = (process.env.NODE_ENV == 'development');
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 
 =======
 >>>>>>> development
 =======
+>>>>>>> development
+=======
+//useEmulator = true;
+
 >>>>>>> development
 let connector: any = useEmulator ? new builder.ChatConnector() : new botbuilder_azure.BotServiceConnector({
     appId: process.env['MicrosoftAppId'],
@@ -49,6 +60,7 @@ let connector: any = useEmulator ? new builder.ChatConnector() : new botbuilder_
     openIdMetadata: process.env['BotOpenIdMetadata']
 });
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 =======
@@ -61,6 +73,17 @@ let AzureTableClient = new botbuilder_azure.AzureTableClient("BotStorage", "trav
 
 let UserTable = new botbuilder_azure.AzureBotStorage({gzipData: false}, AzureTableClient)
 
+=======
+
+//=========================================================
+// Storage Config
+//=========================================================
+let AzureTableClient = new botbuilder_azure.AzureTableClient("BotStorage", "travelrbotc4g2ai", 
+    'cL2Xq/C6MW2ihDet27iU8440FFj1KU0K0TIo1QnYJ3gvyWQ4cn6LysyZInjE0jdeTW75zBTAgTbmkDriNlky0g==')
+
+let UserTable = new botbuilder_azure.AzureBotStorage({gzipData: false}, AzureTableClient)
+
+>>>>>>> development
 =======
 
 //=========================================================
@@ -80,6 +103,9 @@ let now = time.toString();
 // Bot Config
 //=========================================================
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> development
+=======
 >>>>>>> development
 =======
 >>>>>>> development
@@ -2044,6 +2070,7 @@ bot.dialog("/options", [
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
                 session.send("There was an error when looking for transit in your locations.")
             }
@@ -3632,11 +3659,389 @@ bot.dialog("/options", [
                     }
                 }
 
+=======
+                if (transit.transitArrivalTime == "Error")
+                {
+                    session.send("There was an error when looking for transit in your locations.")
+                }
+                else
+                {
+                    if (session.message.source != 'skype')
+                    {
+                        // Array to Hold all direction string 
+                        let stepMessage: any[] = [];
+
+                        for (let step: number = 0; step < transit.transitSteps.length; step++) 
+                        {
+                            // Check to see if walking or transit step
+                            if ( transit.transitSteps[step].stepTransitMode == "WALKING")
+                            {
+                                let walkingStep: Transit.IStepWalkingInfo = transit.transitSteps[step] as Transit.IStepWalkingInfo;
+
+                                let instructions = 
+                                [
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `${walkingStep.stepMainInstruction}`,
+                                        "size": "medium",
+                                        "weight": "bolder",
+                                        "wrap": true
+
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `- Distance: ${walkingStep.stepDistance}`,
+                                        "wrap": true
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `- Duration: ${walkingStep.stepDuration}`,
+                                        "wrap": true
+                                    }
+                                ]
+
+
+                                for (let step: number = 0; step < walkingStep.stepDeatiledInstructions.length; step++)
+                                {
+                                    if (step == walkingStep.stepDeatiledInstructions.length - 1)
+                                    {
+                                        instructions.push(
+                                            {
+                                                "type": "TextBlock",
+                                                "text": `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction}`,
+                                                "wrap": true   
+                                            }
+                                        );
+                                    }
+                                    else
+                                    {
+                                        instructions.push(
+                                            {
+                                                "type": "TextBlock",
+                                                "text": `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction}` ,
+                                                "wrap": true  
+                                            });
+                                    }
+                                }
+
+                                instructions.forEach(step => {
+                                    stepMessage.push(step);
+                                });
+                            }
+
+                            else
+                            {
+                                let transitStep: Transit.IStepTransitInfo = transit.transitSteps[step] as Transit.IStepTransitInfo;
+                                let transitMessage: any[] = 
+                                [
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `${transitStep.stepMainInstruction}`,
+                                        "size": "medium",
+                                        "weight": "bolder",
+                                        "wrap": true   
+
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `- Depature Name: ${transitStep.departureStopName}`,
+                                        "wrap": true  
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `- Deapture Time: ${transitStep.departureStopTime}`,
+                                        "wrap": true  
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `- Arrival Name: ${transitStep.arrivalStopName}`,
+                                        "wrap": true  
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `- Arrival Time: ${transitStep.arrivalStopTime}`,
+                                        "wrap": true  
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `- Distance: ${transitStep.stepDistance} miles`,
+                                        "wrap": true  
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `- Duration: ${transitStep.stepDuration} minutes`,
+                                        "wrap": true  
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `- Number of Stops: ${transitStep.numberOfStop}`,
+                                        "wrap": true  
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `- Vehicle Name: ${transitStep.vehicleName} `,
+                                        "wrap": true  
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": `- Vehicle Type: ${transitStep.vehicleType}`,
+                                        "wrap": true  
+                                    }
+                                ];
+
+                                transitMessage.forEach(step => {
+                                    stepMessage.push(step);
+                                })
+
+                            }
+                        }
+
+                        // Build the step by step directions
+                        let directionMessage: builder.Message = new builder.Message(session)
+                            .addAttachment({
+                                contentType: "application/vnd.microsoft.card.adaptive",
+                                content: 
+                                {
+                                    type: 'AdaptiveCard',
+                                    body: 
+                                    [
+                                        {
+                                            "type": "Container",
+                                            "separation": "default",
+                                            "items":
+                                            [
+                                                {
+                                                    "type": "TextBlock",
+                                                    "text": "Transit Steps",
+                                                    "size": "large",
+                                                    "weight": "bolder"
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "type": "Container",
+                                            "items": stepMessage
+                                        }
+                                                
+                                    ]   
+                                }
+                            })
+
+                        session.send(directionMessage);
+
+                        // repeat the dialog
+                        session.replaceDialog('/options');
+                    }
+
+                    else // if the user is using skype
+                    {
+                        // Array to Hold all direction string 
+                        let directions: string = "";
+
+                        for (let step: number = 0; step < transit.transitSteps.length; step++) 
+                        {
+                            // Check to see if walking or transit step
+                            if ( transit.transitSteps[step].stepTransitMode == "WALKING")
+                            {
+                                let walkingStep: Transit.IStepWalkingInfo = transit.transitSteps[step] as Transit.IStepWalkingInfo;
+
+                                directions += `${walkingStep.stepMainInstruction} <br/> 
+                                - Distance: ${walkingStep.stepDistance} <br/>
+                                - Duration: ${walkingStep.stepDuration} <br/>
+                                `;
+
+                                for (let step: number = 0; step < walkingStep.stepDeatiledInstructions.length; step++)
+                                {
+                                    if (step == walkingStep.stepDeatiledInstructions.length - 1)
+                                    {
+                                        directions += `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction} <br/>`;
+                                    }
+                                    else
+                                    {
+                                        directions += `- Step ${step + 1}: ${walkingStep.stepDeatiledInstructions[step].stepMainInstruction} <br/> 
+                                        `;
+                                    }
+                                }
+                            }
+
+                            else
+                            {
+                                let transitStep: Transit.IStepTransitInfo = transit.transitSteps[step] as Transit.IStepTransitInfo;
+                                
+                                directions += `${transitStep.stepMainInstruction} <br/>
+                                - Depature Name: ${transitStep.departureStopName} <br/>
+                                - Deapture Time: ${transitStep.departureStopTime} <br/>
+                                - Arrival Name: ${transitStep.arrivalStopName} <br/>
+                                - Arrival Time: ${transitStep.arrivalStopTime} <br/>
+                                - Distance: ${transitStep.stepDistance} miles <br/>
+                                - Duration: ${transitStep.stepDuration} minutes <br/>
+                                - Number of Stops: ${transitStep.numberOfStop} <br/>
+                                - Vehicle Name: ${transitStep.vehicleName} <br/>
+                                - Vehicle Type: ${transitStep.vehicleType} <br/>`
+                            }
+                        }
+
+                        session.send(directions);
+
+                        // repeat the dialog
+                        session.replaceDialog('/options');
+                    }
+
+                    
+                }
+            }
+
+            // User want ridesharing information
+            else if (response.response.index == 1)
+            {
+                // Check the rideshare service provider
+                if (rideshare.serviceProvider == "Uber")
+                {
+                    if (session.message.source != 'skype')
+                    {
+                        let uberClientId: string = '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP' //process.env.UBER_APP_ID
+
+                        // Format the addresses
+                        let pickup: string = LocationAddressFomater(session.privateConversationData.start);
+                        let dropoff: string = LocationAddressFomater(session.privateConversationData.end);
+
+
+                        let uberString: string = `https://m.uber.com/ul/?action=setPickup&client_id=${uberClientId}&product_id=${rideshare.proudctId}&pickup[formatted_address]=${pickup}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&dropoff[formatted_address]=${dropoff}&dropoff[latitude]=${endLat}&dropoff[longitude]=${endLong}`;
+                        
+                        let uberCard: builder.Message = new builder.Message(session)
+                            /*.addAttachment({
+                                contentType: "application/vnd.microsoft.card.adaptive",
+                                content:
+                                {
+                                    type: "AdaptiveCard",
+                                    body:
+                                    [
+                                        {
+                                            "type": "TextBlock",
+                                            "text": "Click the image or link to open the app and order your ride!"
+                                        },
+                                        {
+                                            "type": "Image",
+                                            "url": 'https://d1a3f4spazzrp4.cloudfront.net/uber-com/1.2.29/d1a3f4spazzrp4.cloudfront.net/images/apple-touch-icon-144x144-279d763222.png',
+                                            "size": "small",
+                                            "selectAction": 
+                                            {
+                                                "type": "Action.OpenUrl",
+                                                "title": "Order Uber",
+                                                "url": uberString
+                                            }
+                                        }, 
+                                        {
+                                            "type": "Action.OpenUrl",
+                                            "title": "Order an Uber",
+                                            "url": uberString
+                                        }
+                                    ]
+                                }
+                            }) */
+                            .addAttachment(
+                                new builder.ThumbnailCard(session)
+                                    .title("Order an Uber")
+                                    .text("Click to order your Uber in the Uber App!")
+                                    .images([builder.CardImage.create(session, 'https://d1a3f4spazzrp4.cloudfront.net/uber-com/1.2.29/d1a3f4spazzrp4.cloudfront.net/images/apple-touch-icon-144x144-279d763222.png')])
+                                    .buttons([builder.CardAction.openUrl(session, uberString, "Order an Uber"),
+                                    builder.CardAction.dialogAction(session, "repeatOptions", undefined, "Back to options" ),
+                                    builder.CardAction.dialogAction(session, "endConversation", undefined, "Finish")])
+                                    .tap(builder.CardAction.openUrl(session, uberString, "Order Uber"))
+                                    )
+
+                        session.send(uberCard);
+                    }
+
+                    else // if the client is skype
+                    {
+                        let uberClientId: string = '4-FEfPZXTduBZtGu6VqBrTQvg0jZs8WP' //process.env.UBER_APP_ID
+
+                        // Format the addresses
+                        let pickup: string = LocationAddressFomater(session.privateConversationData.start);
+                        let dropoff: string = LocationAddressFomater(session.privateConversationData.end);
+
+                        // Order the Uber
+                        session.send("Click the link to open the app and order your ride!");
+
+                        let uberString: string = `'https://m.uber.com/ul/?action=setPickup&client_id=${uberClientId}&product_id=${rideshare.proudctId}&pickup[formatted_address]=${pickup}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&dropoff[formatted_address]=${dropoff}&dropoff[latitude]=${endLat}&dropoff[longitude]=${endLong}`;
+                        
+                        session.send(uberString);
+                    }
+                        
+            }   
+
+                else if (rideshare.serviceProvider == 'Lyft')
+                {
+                    if (session.message.source != 'skype')
+                    {
+                        let clientId: string = '9LHHn1wknlgs';
+
+
+                        // Order the Lyft
+                        let lyftString: string = `https://lyft.com/ride?id=${rideshare.proudctId}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&partner=${clientId}&destination[latitude]=${endLat}&destination[longitude]=${endLong}`;
+
+                        let lyftCard: builder.Message = new builder.Message(session)
+                            /*.addAttachment({
+                                contentType: "application/vnd.microsoft.card.adaptive",
+                                content:
+                                {
+                                    type: "AdaptiveCard",
+                                    body:
+                                    [
+                                        {
+                                            "type": "TextBlock",
+                                            "text": "Click the image or link to open the app and order your ride!"
+                                        },
+
+                                        {
+                                            "type": "Image",
+                                            "url": 'https://www.lyft.com/apple-touch-icon-precomposed-152x152.png',
+                                            "size": "small",
+                                            "selectAction": 
+                                            {
+                                                "type": "Action.OpenUrl",
+                                                "title": "Order Lyft",
+                                                "url": lyftString
+                                            }
+                                        }, 
+                                        {
+                                            "type": "Action.OpenUrl",
+                                            "title": "Order an Lyft",
+                                            "url": lyftString
+                                        }
+                                    ]
+                                }
+                            }) */
+                        .addAttachment(new builder.ThumbnailCard(session)
+                            .title("Order your Lyft!")
+                            .text("Click the button to order your Lyft in the Lyft App!")
+                            .subtitle("If on SMS say 'Order Lyft' to order the ride")
+                            .images([builder.CardImage.create(session, "https://www.lyft.com/apple-touch-icon-precomposed-152x152.png")])
+                            .tap(builder.CardAction.openUrl(session, lyftString, "Order Lyft"))
+                            .buttons([builder.CardAction.openUrl(session, lyftString, "Order Lyft"), 
+                                builder.CardAction.dialogAction(session, "repeatOptions", undefined , "Back to options"),
+                                builder.CardAction.dialogAction(session, "endConversation", undefined, "Finish")]));
+
+                        session.send(lyftCard);
+                    }
+                    else // The source is skype
+                    {
+                        let clientId: string = '9LHHn1wknlgs';
+                        // Order the Lyft
+                        session.send("Or click the link to open the app and order your ride!");
+                        let lyftString: string = `https://lyft.com/ride?id=${rideshare.proudctId}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&partner=${clientId}&destination[latitude]=${endLat}&destination[longitude]=${endLong}`;
+                        session.send(lyftString);
+                    }
+                }
+
+>>>>>>> development
                 else // If there was on error
                 {
                     session.send("We could not find any ridesharing options here");
                 }
             }
+<<<<<<< HEAD
 =======
                         // Order the Lyft
                         let lyftString: string = `https://lyft.com/ride?id=${rideshare.proudctId}&pickup[latitude]=${startLat}&pickup[longitude]=${startLong}&partner=${clientId}&destination[latitude]=${endLat}&destination[longitude]=${endLong}`;
@@ -4077,6 +4482,15 @@ bot.dialog('/signUp', [
                 console.log(error);
             }   
         })
+=======
+            // User is done with the conversation
+            else
+            {
+                session.endConversation("Thank you for using Travelr! Have a great day!");
+            }
+        }
+                 
+>>>>>>> development
     }
 
 ])
@@ -4096,6 +4510,209 @@ bot.dialog('/addFavorites', [
 
     function (session: builder.Session, results: builder.IPromptTextResult, next: any)
     {
+<<<<<<< HEAD
+=======
+        if (response.response)
+        {
+            if(response.response.index == 0)
+            {
+                session.send(`Company Info
+                
+                Travelr is all about creating a more enjoyable commuting experience.
+                
+                We are your urban travel guide to make your daily commute better we match your preferences and find the best options 
+                avialable for you including price, time, group size, and a luxurious option.
+
+                By connecting users to one another we enhance the quality of everyone's dialy commute. This means that every user
+                depending on their choice will be able to find the quickest route, the cheapest ride, or the best luxury deal available.`
+                );
+            }
+
+            else if(response.response.index == 1)
+            {
+                session.send(`Privacy
+                
+                Retainment of information
+
+                This bot is currently in beta. We do not ask for nor retain personal information including but not limited to: Name, DOB, Mailing or Biling Address, etc...
+                Although, not yet implemented, Travelr does intend to eventually retain your starting location, destiantion, and the best services our system produces. 
+                This information will eventually help us with creating a better and faster bot by allowing us to run analysis on the transportation systems in your geographic area.
+
+                Sale of information
+
+                We will not sell the retained informaiton. The informaiton will be used for our own purposes as stated above. We will update our privacy statements accordingly.`);
+            }
+
+            else if(response.response.index == 2)
+            {
+                session.send(`How It Works
+
+                Travelr asks the user for their commuting preferences and then it asks the user for their starting and ending locations. After
+                typing in their preferences and destination our algorithim internally finds the best choice for the user.`)
+            }
+            else
+            {
+                session.send("Returning you back to the help dialog!");
+                session.endDialog();
+            }
+        
+        }
+        console.log("Going to the next step");
+        next();
+
+    },
+
+    (session: builder.Session) =>
+    {
+        session.replaceDialog("/info");
+    }
+
+])
+
+bot.dialog("/account", [
+    (session, args, next) =>
+    {
+        console.log("Getting choice");
+        builder.Prompts.choice(session, "Welcome to the account settings! Would you like to 'Sign Up', 'Login', 'Edit', or 'Cancel'?", ['Sign Up', 'Login', 'Edit', 'Cancel']);
+    },
+
+    (session: builder.Session, results: builder.IPromptChoiceResult, next: any) =>
+    {
+        console.log("Directing the choice")
+
+        if (results.response)
+        {
+            if (results.response.index == 0) // Sign up
+            {
+                session.beginDialog('/signUp');
+            }
+            else if (results.response.index == 1) // login
+            {
+                session.beginDialog('/login');
+            }
+            else if (results.response.index == 2) // edit
+            {
+                session.beginDialog('/edit')
+            }
+            else if (results.response.index == 3) // cancel
+            {
+                session.endDialog("Okay returning you to the main menu!")
+            }
+        }
+
+    },
+    (session: builder.Session, results: builder.IDialogResult<any>, next: any) =>
+    {
+        if (results.resumed == builder.ResumeReason.completed)
+        {
+            session.replaceDialog('/');
+        }
+    } 
+])
+
+bot.dialog('/signUp', [
+    function (session, args, next)
+    {
+        console.log("In the sign up dialog");
+        console.log("Getting the users phone number");
+        builder.Prompts.text(session, "Welcome to the sign up dialog! What is your phone number? Your phone number will become your ID.");
+    },
+    function (session, results, next)
+    {
+        console.log("Getting the user's pin")
+        let phone = results.response.trim();
+        let finalPhone = PhoneStrip(phone);
+
+        session.userData.phone = finalPhone;
+        builder.Prompts.text(session, "Great! Now we just need a custom pin. It can be of any length or combination!");
+    },
+
+    function (session, results, next)
+    {
+        console.log("Asking for add to favorites")
+        session.userData.pin = results.response;
+        builder.Prompts.choice(session, "Would you like to add your favorite places?", ["Yes", "No"])
+    }, 
+
+    function (session, results: builder.IPromptChoiceResult, next: any)
+    {
+        
+        if (results.response && results.response.index == 0) // yes
+        {   session.send("Awesome, starting the 'Add Favorites' dialog!");
+            console.log("starting the add favorites dialog!")
+            let response: builder.Session = session.beginDialog('/addFavorites');
+        }
+        else // no
+        {
+            next()
+        }
+
+    }, 
+    function (session: builder.Session, args: any, next: any)
+    {
+
+        console.log("Building the user's account")
+        // build the account
+        
+        // Check to see if favorite locations have been added 
+        let FavoriteLocations = session.userData.favoriteLocations;
+
+        // Determine if undefined
+        if (!FavoriteLocations)
+        {
+            FavoriteLocations = {};
+        }
+
+        var VisitedLocations = 
+        {
+            [now]:
+            {
+            }
+        };
+
+        var Entity = 
+        {
+            PartitionKey: entGen.String(session.userData.phone),
+            RowKey: entGen.String(session.userData.pin),
+            Favorite_Locations: entGen.String(JSON.stringify(FavoriteLocations)),
+            Visited_Locations: entGen.String(JSON.stringify(VisitedLocations))
+        };
+
+        tableService.insertOrReplaceEntity("User", Entity, function (error, result, response)
+        {
+            if (!error) 
+            {
+                    console.log("Person added to Table");
+                    session.userData.favoriteLocations = FavoriteLocations;
+                    session.endDialog("Your account has been updated. And you have been signed in!");
+            }
+            else 
+            {
+                console.log("There was an error adding the person: \n\n");
+                session.endDialog("There was an error updating your account");
+                console.log(error);
+            }   
+        })
+    }
+
+])
+
+bot.dialog('/addFavorites', [
+    
+    function (session: builder.Session, args, next: any)
+    {
+        builder.Prompts.text(session, "What is the name of your favorite location? E.g. 'Work', or 'Home'");
+    },
+
+    function (session: builder.Session, results: builder.IPromptTextResult, next: any)
+    {
+        session.dialogData.tempFavoriteLocationName = results.response;
+        builder.Prompts.text(session, "What is the address for that location? E.g. '2200 Main Street Austin, Texas' or '15 and Broadway New York, New York'");
+    },
+
+    function (session: builder.Session, results: builder.IPromptTextResult, next: any)
+    {
+>>>>>>> development
         // save the data
         session.dialogData.tempFavoriteLocationAddress = results.response;
 
@@ -4110,6 +4727,7 @@ bot.dialog('/addFavorites', [
             // get the longitude
             let long = response.json.results[0].geometry.location.lng;
             session.dialogData.long = response.json.results[0].geometry.location.lng;
+<<<<<<< HEAD
             
             
             let mapMessage: builder.Message = map_builder.map_card_builder(session, lat, long)
@@ -4122,6 +4740,18 @@ bot.dialog('/addFavorites', [
 
 
 =======
+
+            builder.Prompts.choice(session, `You said your location name was '${session.dialogData.tempFavoriteLocationName}' and the address was '${results.response}.' Is that correct?`, ["Yes", "No"]);
+
+
+>>>>>>> development
+=======
+            
+            
+            let mapMessage: builder.Message = map_builder.map_card_builder(session, lat, long)
+            mapMessage.text("Is this the correct information?")
+            session.send(mapMessage);
+            
 
             builder.Prompts.choice(session, `You said your location name was '${session.dialogData.tempFavoriteLocationName}' and the address was '${results.response}.' Is that correct?`, ["Yes", "No"]);
 
@@ -4166,6 +4796,7 @@ bot.dialog('/addFavorites', [
                 }
                 session.userData.favoriteLocations = FavoriteLocation;
             }
+<<<<<<< HEAD
 
             builder.Prompts.choice(session, "Would you like to add another favorite?", ["Yes", "No"]);
 
@@ -4235,6 +4866,41 @@ bot.dialog('/login', [
         };
 
 =======
+=======
+
+            builder.Prompts.choice(session, "Would you like to add another favorite?", ["Yes", "No"]);
+
+        }
+        else if (results.response && results.response.index == 1) // no they are not correct
+        {
+            session.send("Okay we will start over");
+            session.replaceDialog("/addFavorites");
+        }
+    },
+    
+    function (session: builder.Session, results: builder.IPromptChoiceResult, next: any)
+    {
+        if (results.response && results.response.index == 0) // want to add another location
+        {
+            session.replaceDialog('/addFavorites')
+        }
+        else if (results.response && results.response.index == 1) // do not want to add another 
+        {
+            session.endDialog("Okay, updating your account!");
+        }
+    }
+])
+
+bot.dialog('/removeFavorites', [
+    (session: builder.Session, results: any, next: any) =>
+    {
+        // Add the favorites to the string array
+        let favorites: string[] = ["Cancel"];
+        console.log(session.userData.favoriteLocations);
+        let favoriteLocations: any = session.userData.favoriteLocations
+        for (let key in favoriteLocations)
+        {
+            favorites.push(key);
         }
 
         builder.Prompts.choice(session, "Which location would you like to remove from favorites?", favorites);
@@ -4250,6 +4916,92 @@ bot.dialog('/login', [
             }
         }
 
+        // upload the new favorite locations to userData
+        session.userData.favoriteLocations = favoriteLocations;
+        session.endDialog();
+    }
+])
+
+bot.dialog('/login', [
+    (session: builder.Session, results: any, next: any) =>
+    {
+        builder.Prompts.text(session, "Welcome to the 'Login Dialog'. What is your Phone Number?");
+    },
+    (session: builder.Session, results: builder.IPromptTextResult, next: any) =>
+    {
+        if (results.response)
+        {
+            session.dialogData.phone = PhoneStrip(results.response)
+        };
+
+        builder.Prompts.text(session, "What is your pin?")
+
+    },
+    (session: builder.Session, results: builder.IPromptTextResult, next: any) =>
+    {
+        session.dialogData.pin = results.response;
+
+        console.log("Getting the user from the table")
+        let query = new azureStorage.TableQuery()
+            .where('PartitionKey eq ?', session.dialogData.phone)
+            .and("RowKey eq ?", session.dialogData.pin);
+        tableService.queryEntities("User", query, null, function (error, result, response)
+        {
+            if (error)
+            {   
+                console.log("There was an error getting the user.")
+                console.log(error)
+                builder.Prompts.text(session, "There was an unknown error finding your account. Would you like to try again?", ["Yes", "No"]);
+            }
+            else
+            {
+                console.log("No Error!")
+
+                // Check to see if the user was found
+                if (result.entries.length == 0)
+                {
+                    builder.Prompts.choice(session, "We could not find your account. Would you like to try again?", ["Yes", "No"]);
+                }
+                else
+                {
+                    // Get all of the locations and restore the account
+                    console.log(result.entries[0].Favorite_Locations._);
+
+                    session.userData.favoriteLocations = JSON.parse(result.entries[0].Favorite_Locations._);
+                    session.userData.phone = session.dialogData.phone;
+                    session.userData.pin = session.dialogData.pin;
+                    session.endDialog("We found your account! You are now logged in. ")
+                }
+            }
+        })
+    },
+    (session: builder.Session, results: builder.IPromptChoiceResult, next: any) =>
+    {
+        if (results.response && results.response.index == 0) // yes, try again
+        {
+            session.replaceDialog('/login');
+>>>>>>> development
+        }
+
+        builder.Prompts.choice(session, "Which location would you like to remove from favorites?", favorites);
+    },
+    (session: builder.Session, results: builder.IPromptChoiceResult, next: any) =>
+    {
+        let favoriteLocations: any = session.userData.favoriteLocations
+        for (let key in favoriteLocations)
+        {
+<<<<<<< HEAD
+            if (results.response && key == results.response.entity)
+            {
+                delete favoriteLocations[key]
+            }
+=======
+            session.endDialog("Okay I am returning you to the previous dialog.");
+>>>>>>> development
+        }
+    }
+
+<<<<<<< HEAD
         // upload the new favorite locations to userData
         session.userData.favoriteLocations = favoriteLocations;
         session.endDialog();
@@ -4328,6 +5080,14 @@ bot.dialog('/edit', [
 
     (session: builder.Session, args: any, next: any) =>
     {
+=======
+])
+
+bot.dialog('/edit', [
+
+    (session: builder.Session, args: any, next: any) =>
+    {
+>>>>>>> development
         session.send("Welcome to the 'Account Edit Dialog!' We need to make sure you are logged in in first!")
 
         // check to see if there is user data

@@ -35,11 +35,16 @@ var googleMapsClient = googleMaps.createClient({
 // Connector Configuration
 //=========================================================
 var useEmulator = (process.env.NODE_ENV == 'development');
+<<<<<<< HEAD
 useEmulator = true;
 var connector = useEmulator ? new builder.ChatConnector() : new botbuilder_azure.BotServiceConnector({
 <<<<<<< HEAD
 >>>>>>> development
 =======
+>>>>>>> development
+=======
+//useEmulator = true;
+var connector = useEmulator ? new builder.ChatConnector() : new botbuilder_azure.BotServiceConnector({
 >>>>>>> development
     appId: process.env['MicrosoftAppId'],
     appPassword: process.env['MicrosoftAppPassword'],
@@ -48,8 +53,11 @@ var connector = useEmulator ? new builder.ChatConnector() : new botbuilder_azure
 });
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 let bot = new builder.UniversalBot(connector);
 =======
+=======
+>>>>>>> development
 =======
 >>>>>>> development
 //=========================================================
@@ -66,6 +74,9 @@ var now = time.toString();
 //=========================================================
 var bot = new builder.UniversalBot(connector).set('storage', UserTable);
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> development
+=======
 >>>>>>> development
 =======
 >>>>>>> development
@@ -104,7 +115,10 @@ function LocationAddressFomater(address) {
 }
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> development
 =======
 >>>>>>> development
 function PhoneStrip(phone) {
@@ -142,6 +156,7 @@ bot.dialog("/help", [
     },
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     (session, results, next) => {
         if (results.response.index == 0) {
             session.beginDialog('/info');
@@ -154,6 +169,8 @@ bot.dialog("/help", [
         else {
             session.endDialog("Leaving the help dialog and returning you to your step!");
 =======
+=======
+>>>>>>> development
 =======
 >>>>>>> development
     function (session, results, next) {
@@ -170,6 +187,9 @@ bot.dialog("/help", [
                 session.endDialog("Leaving the help dialog and returning you to your step!");
             }
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> development
+=======
 >>>>>>> development
 =======
 >>>>>>> development
@@ -192,8 +212,11 @@ bot.dialog("/help", [
 });
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 bot.dialog('/', [
 =======
+=======
+>>>>>>> development
 =======
 >>>>>>> development
 bot.beginDialogAction("repeatOptions", "/options", {});
@@ -266,6 +289,7 @@ bot.dialog("/favoriteLocations", [
     },
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     function (session, result, next) {
         console.log("Determining result");
         switch (result.response.index) {
@@ -281,6 +305,8 @@ bot.dialog("/favoriteLocations", [
                 session.userData.perference = 0;
                 break;
 =======
+=======
+>>>>>>> development
 =======
 >>>>>>> development
     function (session, results, next) {
@@ -301,6 +327,7 @@ bot.dialog("/favoriteLocations", [
                     }
                 }
             }
+<<<<<<< HEAD
 <<<<<<< HEAD
 >>>>>>> development
         }
@@ -391,6 +418,78 @@ bot.dialog("/favoriteLocations", [
 =======
 =======
 >>>>>>> development
+=======
+        }
+    },
+    function (session, results, next) {
+        // Check to see if the information has been recieved
+        // The user chose a custom address
+        if (results.response) {
+            console.log("Adding the information for custom information.");
+            // set the start address name
+            session.privateConversationData.start = results.response;
+            // set the starting lat and long 
+            // call the google maps function to get the session.privateConversationData 
+            googleMapsClient.geocode({ address: session.privateConversationData.start }, function (err, response) {
+                if (!err) {
+                    // Get and save the latitude
+                    session.privateConversationData.start_lat = response.json.results[0].geometry.location.lat;
+                    // get the longitude
+                    session.privateConversationData.start_long = response.json.results[0].geometry.location.lng;
+                    // send the location image in a message 
+                    console.log("Building the location message");
+                    var locationMessage_1 = map_builder.map_card_builder(session, response.json.results[0].geometry.location.lat, response.json.results[0].geometry.location.lng);
+                    locationMessage_1.text("Here is your custom starting location. You can say say 'restart' to re-enter if it is wrong");
+                    console.log("Sending the location image message");
+                    session.send(locationMessage_1);
+                }
+                else {
+                    // Call the error dialogue
+                    console.log("There was an error getting your starting location");
+                }
+            });
+        }
+        console.log("Asking for destination");
+        var locationChoice = ["Custom"];
+        // build the base location message for the favorites maps
+        var locationMessage = new builder.Message(session)
+            .attachmentLayout(builder.AttachmentLayout.carousel)
+            .addAttachment(new builder.HeroCard(session)
+            .title("Custom"));
+        //  Get the favorite locations
+        var favoriteLocations = session.userData.favoriteLocations;
+        // loop through each location and build out the buttons and hero card images
+        for (var key in favoriteLocations) {
+            locationChoice.push(key);
+            // add an attachment to the hero card carousel
+            locationMessage
+                .addAttachment(new builder.HeroCard(session)
+                .title(key)
+                .images([builder.CardImage.create(session, map_builder.map_image_location_builder(favoriteLocations[key].lat, favoriteLocations[key].long))]));
+        }
+        session.send(locationMessage);
+        builder.Prompts.choice(session, "Great! For your destination, you can enter a customer address or select one of your favorites", locationChoice);
+    },
+    function (session, results, next) {
+        if (results.response) {
+            if (results.response.index == 0) {
+                builder.Prompts.text(session, "What is your destination? (E.g. 1600 Pennsylvania Avenue  or The Space Needle)");
+            }
+            else {
+                // Find the key's pair 
+                var favoriteLocations = session.userData.favoriteLocations;
+                for (var key in favoriteLocations) {
+                    if (key == results.response.entity) {
+                        // set the user's end, end lat, and end long converstation data 
+                        session.privateConversationData.end = favoriteLocations[key].address;
+                        session.privateConversationData.end_lat = favoriteLocations[key].lat;
+                        session.privateConversationData.end_long = favoriteLocations[key].long;
+                        next();
+                    }
+                }
+            }
+        }
+>>>>>>> development
     },
     function (session, results, next) {
         // Check to see if the information has been recieved
@@ -420,6 +519,9 @@ bot.dialog("/favoriteLocations", [
         // Start the next dialog if a favorite was chosen
         session.beginDialog("/preferences");
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> development
+=======
 >>>>>>> development
 =======
 >>>>>>> development
@@ -427,6 +529,7 @@ bot.dialog("/favoriteLocations", [
 ]).reloadAction("reloadLocations", "Getting your location again", {
     matches: [/^restart/i, /^start over/i, /^redo/i]
 });
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 bot.dialog("/locations", [
@@ -471,6 +574,21 @@ bot.dialog('/customLocations', [
         googleMapsClient.geocode({ address: session.privateConversationData.start }, function (err, response) {
             if (!err) {
 >>>>>>> development
+=======
+bot.dialog('/customLocations', [
+    function (session) {
+        builder.Prompts.text(session, "What is your starting location? (E.g. 22nd and Main Austin Texas or JKF Airport)");
+    },
+    function (session, results, next) {
+        // Check to see if the information has been recieved
+        if (results.response) {
+            session.privateConversationData.start = results.response;
+        }
+        // set the starting lat and long 
+        // call the google maps function to get the session.privateConversationData 
+        googleMapsClient.geocode({ address: session.privateConversationData.start }, function (err, response) {
+            if (!err) {
+>>>>>>> development
                 // Get and save the latitude
                 session.privateConversationData.start_lat = response.json.results[0].geometry.location.lat;
                 // get the longitude
@@ -482,6 +600,9 @@ bot.dialog('/customLocations', [
                 console.log("Asking for destination");
                 builder.Prompts.text(session, "What is your destination? (E.g. 1600 Pennsylvania Avenue  or The Space Needle)");
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> development
+=======
 >>>>>>> development
 =======
 >>>>>>> development
@@ -491,6 +612,7 @@ bot.dialog('/customLocations', [
             }
         });
     },
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
     function (session) {
@@ -527,6 +649,16 @@ bot.dialog('/customLocations', [
         googleMapsClient.geocode({ address: session.privateConversationData.end }, function (err, response) {
             if (!err) {
 >>>>>>> development
+=======
+    function (session, results, next) {
+        // Check to see if the information has been recieved
+        if (results.response) {
+            session.privateConversationData.end = results.response;
+        }
+        // Get and set the lat and long for the destiation
+        googleMapsClient.geocode({ address: session.privateConversationData.end }, function (err, response) {
+            if (!err) {
+>>>>>>> development
                 // get the latitutde
                 session.privateConversationData.end_lat = response.json.results[0].geometry.location.lat;
                 // get the longitude
@@ -538,6 +670,9 @@ bot.dialog('/customLocations', [
                 // Start the next dialog
                 session.beginDialog("/preferences");
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> development
+=======
 >>>>>>> development
 =======
 >>>>>>> development
@@ -601,6 +736,7 @@ bot.dialog('/preferences', [
     matches: [/^restart/i, /^start over/i]
 });
 bot.dialog('/calculation', [
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
     function (session, args, next) {
@@ -715,6 +851,79 @@ bot.dialog('/calculation', [
         // Build the message for the locations
         var message = new builder.Message(session)
             .attachments([{
+=======
+    //=========================================================
+    // Map information and Table Upload
+    //=========================================================
+    // Begin processing the information
+    function (session, args, next) {
+        session.send("Hold on while we get your results");
+        // pull down the lats and long
+        var start_lat = session.privateConversationData.start_lat;
+        var end_lat = session.privateConversationData.end_lat;
+        var start_long = session.privateConversationData.start_long;
+        var end_long = session.privateConversationData.end_long;
+        var start = session.privateConversationData.start;
+        var end = session.privateConversationData.end;
+        var phone = session.userData.phone;
+        var pin = session.userData.pin;
+        if (phone && pin) {
+            // Get there account information for visted locations
+            var query = new azureStorage.TableQuery()
+                .select(["Visited_Locations"])
+                .where('PartitionKey eq ?', phone)
+                .and("RowKey eq ?", pin);
+            // Execute the query 
+            tableService.queryEntities("User", query, null, function (error, results, response) {
+                if (error) {
+                    console.log("Thee was an error seraching for the person");
+                    console.log(error);
+                }
+                else {
+                    console.log("No errors commiting query");
+                    if (results.entries.length == 0) {
+                        console.log("Person was not found");
+                    }
+                    else {
+                        console.log(results.entries);
+                        var visitedLocations = JSON.parse(results.entries[0].Visited_Locations._);
+                        visitedLocations[now] =
+                            {
+                                start: {
+                                    name: start,
+                                    lat: start_lat,
+                                    long: start_long
+                                },
+                                end: {
+                                    name: end,
+                                    lat: end_lat,
+                                    long: end_long
+                                }
+                            };
+                        // Send the users information to the cloud as a string
+                        // Form the entity to be sent 
+                        var updateUser = {
+                            PartitionKey: entGen.String(phone),
+                            RowKey: entGen.String(pin),
+                            Visited_Locations: entGen.String(JSON.stringify(visitedLocations))
+                        };
+                        tableService.insertOrMergeEntity("User", updateUser, function (error, result, response) {
+                            if (!error) {
+                                console.log("User info updated on the table");
+                            }
+                            else {
+                                console.log("There was an error adding the person: \n\n");
+                                console.log(error);
+                            }
+                        });
+                    }
+                }
+            });
+        }
+        // Build the message for the locations
+        var message = new builder.Message(session)
+            .attachments([{
+>>>>>>> development
 =======
     //=========================================================
     // Map information and Table Upload
@@ -923,7 +1132,12 @@ bot.dialog('/calculation', [
                             });
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
                             session.userData.Transit = transitLegInfo;
+=======
+                            // save the transit information
+                            session.privateConversationData.Transit = transitLegInfo;
+>>>>>>> development
 =======
                             // save the transit information
                             session.privateConversationData.Transit = transitLegInfo;
@@ -984,7 +1198,12 @@ bot.dialog('/calculation', [
                 uberFlag = true;
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
                 session.userData.Uber = best_uber_option;
+=======
+                // Set the User data
+                session.privateConversationData.Uber = best_uber_option;
+>>>>>>> development
 =======
                 // Set the User data
                 session.privateConversationData.Uber = best_uber_option;
@@ -1047,11 +1266,14 @@ bot.dialog('/calculation', [
                 request(options, function (error, response, info) {
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
                     let body = JSON.parse(info);
                     let product = [];
                     let uber_price = 99999;
                     let best_uber_option = {
 =======
+=======
+>>>>>>> development
 =======
 >>>>>>> development
                     // Send the uber information to the cloud as a string
@@ -1108,6 +1330,9 @@ bot.dialog('/calculation', [
                         // Set the User data
                         session.privateConversationData.Uber = best_uber_option_1;
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> development
+=======
 >>>>>>> development
 =======
 >>>>>>> development
@@ -1179,6 +1404,9 @@ bot.dialog('/calculation', [
                                 // Set the User data
                                 session.privateConversationData.Uber = best_uber_option_2;
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> development
+=======
 >>>>>>> development
 =======
 >>>>>>> development
@@ -1188,7 +1416,12 @@ bot.dialog('/calculation', [
                                 best_uber_option.uber_driver_time = body.times[0].estimate;
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
                                 session.userData.Uber = best_uber_option;
+=======
+                                // Set the User data
+                                session.privateConversationData.Uber = best_uber_option;
+>>>>>>> development
 =======
                                 // Set the User data
                                 session.privateConversationData.Uber = best_uber_option;
@@ -1235,7 +1468,12 @@ bot.dialog('/calculation', [
                 lyftFlag = true;
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
                 session.userData.Lyft = best_lyft_option;
+=======
+                // Save the info to user data
+                session.privateConversationData.Lyft = best_lyft_option;
+>>>>>>> development
 =======
                 // Save the info to user data
                 session.privateConversationData.Lyft = best_lyft_option;
@@ -1330,6 +1568,7 @@ bot.dialog('/calculation', [
                         lyftFlag = true;
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
                         session.userData.Lyft = best_lyft_option;
                     }
                     else {
@@ -1343,6 +1582,13 @@ bot.dialog('/calculation', [
                     }
                     else {
                         console.log("Have lyft prices");
+=======
+                        // Save the info to user data
+                        session.privateConversationData.Lyft = best_lyft_option;
+                    }
+                    else {
+                        console.log("Have lyft prices");
+>>>>>>> development
 =======
                         // Save the info to user data
                         session.privateConversationData.Lyft = best_lyft_option;
@@ -1459,6 +1705,9 @@ bot.dialog('/calculation', [
                                 // Save the info to user data
                                 session.privateConversationData.Lyft = best_lyft_option_1;
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> development
+=======
 >>>>>>> development
 =======
 >>>>>>> development
@@ -1481,6 +1730,9 @@ bot.dialog('/calculation', [
         // End of Calculations
         //=========================================================
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> development
+=======
 >>>>>>> development
 =======
 >>>>>>> development
@@ -1794,7 +2046,12 @@ bot.dialog('/calculation', [
         }
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         session.userData.Rideshare = rideshare;
+=======
+        // Add the options to the privateConversationData
+        session.privateConversationData.Rideshare = rideshare;
+>>>>>>> development
 =======
         // Add the options to the privateConversationData
         session.privateConversationData.Rideshare = rideshare;
@@ -1811,6 +2068,7 @@ bot.dialog("/options", [
         builder.Prompts.choice(session, "Type the number or name to order or get more info or hit finished", ["Transit", 'Rideshare', "Finished"]);
     },
     function (session, response, next) {
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
         let transit = session.userData.Transit;
@@ -2060,6 +2318,129 @@ bot.dialog("/options", [
                                 });
                             }
                         }
+=======
+        // Get the transit and rideshare options 
+        var transit = session.privateConversationData.Transit;
+        var rideshare = session.privateConversationData.Rideshare;
+        var startLat = session.privateConversationData.start_lat;
+        var startLong = session.privateConversationData.start_long;
+        var endLat = session.privateConversationData.end_lat;
+        var endLong = session.privateConversationData.end_long;
+        if (response.response) {
+            // User wants to see transit information
+            if (response.response.index == 0) {
+                if (transit.transitArrivalTime == "Error") {
+                    session.send("There was an error when looking for transit in your locations.");
+                }
+                else {
+                    if (session.message.source != 'skype') {
+                        // Array to Hold all direction string 
+                        var stepMessage_1 = [];
+                        for (var step = 0; step < transit.transitSteps.length; step++) {
+                            // Check to see if walking or transit step
+                            if (transit.transitSteps[step].stepTransitMode == "WALKING") {
+                                var walkingStep = transit.transitSteps[step];
+                                var instructions = [
+                                    {
+                                        "type": "TextBlock",
+                                        "text": "" + walkingStep.stepMainInstruction,
+                                        "size": "medium",
+                                        "weight": "bolder",
+                                        "wrap": true
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": "- Distance: " + walkingStep.stepDistance,
+                                        "wrap": true
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": "- Duration: " + walkingStep.stepDuration,
+                                        "wrap": true
+                                    }
+                                ];
+                                for (var step_1 = 0; step_1 < walkingStep.stepDeatiledInstructions.length; step_1++) {
+                                    if (step_1 == walkingStep.stepDeatiledInstructions.length - 1) {
+                                        instructions.push({
+                                            "type": "TextBlock",
+                                            "text": "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction,
+                                            "wrap": true
+                                        });
+                                    }
+                                    else {
+                                        instructions.push({
+                                            "type": "TextBlock",
+                                            "text": "- Step " + (step_1 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_1].stepMainInstruction,
+                                            "wrap": true
+                                        });
+                                    }
+                                }
+                                instructions.forEach(function (step) {
+                                    stepMessage_1.push(step);
+                                });
+                            }
+                            else {
+                                var transitStep = transit.transitSteps[step];
+                                var transitMessage = [
+                                    {
+                                        "type": "TextBlock",
+                                        "text": "" + transitStep.stepMainInstruction,
+                                        "size": "medium",
+                                        "weight": "bolder",
+                                        "wrap": true
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": "- Depature Name: " + transitStep.departureStopName,
+                                        "wrap": true
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": "- Deapture Time: " + transitStep.departureStopTime,
+                                        "wrap": true
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": "- Arrival Name: " + transitStep.arrivalStopName,
+                                        "wrap": true
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": "- Arrival Time: " + transitStep.arrivalStopTime,
+                                        "wrap": true
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": "- Distance: " + transitStep.stepDistance + " miles",
+                                        "wrap": true
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": "- Duration: " + transitStep.stepDuration + " minutes",
+                                        "wrap": true
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": "- Number of Stops: " + transitStep.numberOfStop,
+                                        "wrap": true
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": "- Vehicle Name: " + transitStep.vehicleName + " ",
+                                        "wrap": true
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "text": "- Vehicle Type: " + transitStep.vehicleType,
+                                        "wrap": true
+                                    }
+                                ];
+                                transitMessage.forEach(function (step) {
+                                    stepMessage_1.push(step);
+                                });
+                            }
+                        }
+>>>>>>> development
                         // Build the step by step directions
                         var directionMessage = new builder.Message(session)
                             .addAttachment({
@@ -2067,6 +2448,7 @@ bot.dialog("/options", [
                             content: {
                                 type: 'AdaptiveCard',
                                 body: [
+<<<<<<< HEAD
 >>>>>>> development
                                     {
 =======
@@ -2200,6 +2582,9 @@ bot.dialog("/options", [
                                 body: [
                                     {
 >>>>>>> development
+=======
+                                    {
+>>>>>>> development
                                         "type": "Container",
                                         "separation": "default",
                                         "items": [
@@ -2218,10 +2603,13 @@ bot.dialog("/options", [
                                 ]
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
                             },
                             {
                                 "type": "Container",
                                 "items": stepMessage
+=======
+>>>>>>> development
 =======
 >>>>>>> development
 =======
@@ -2232,6 +2620,7 @@ bot.dialog("/options", [
                         // repeat the dialog
                         session.replaceDialog('/options');
                     }
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
                 });
@@ -2322,6 +2711,36 @@ bot.dialog("/options", [
                 }
             }
 >>>>>>> development
+=======
+                    else {
+                        // Array to Hold all direction string 
+                        var directions = "";
+                        for (var step = 0; step < transit.transitSteps.length; step++) {
+                            // Check to see if walking or transit step
+                            if (transit.transitSteps[step].stepTransitMode == "WALKING") {
+                                var walkingStep = transit.transitSteps[step];
+                                directions += walkingStep.stepMainInstruction + " <br/> \n                                - Distance: " + walkingStep.stepDistance + " <br/>\n                                - Duration: " + walkingStep.stepDuration + " <br/>\n                                ";
+                                for (var step_2 = 0; step_2 < walkingStep.stepDeatiledInstructions.length; step_2++) {
+                                    if (step_2 == walkingStep.stepDeatiledInstructions.length - 1) {
+                                        directions += "- Step " + (step_2 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_2].stepMainInstruction + " <br/>";
+                                    }
+                                    else {
+                                        directions += "- Step " + (step_2 + 1) + ": " + walkingStep.stepDeatiledInstructions[step_2].stepMainInstruction + " <br/> \n                                        ";
+                                    }
+                                }
+                            }
+                            else {
+                                var transitStep = transit.transitSteps[step];
+                                directions += transitStep.stepMainInstruction + " <br/>\n                                - Depature Name: " + transitStep.departureStopName + " <br/>\n                                - Deapture Time: " + transitStep.departureStopTime + " <br/>\n                                - Arrival Name: " + transitStep.arrivalStopName + " <br/>\n                                - Arrival Time: " + transitStep.arrivalStopTime + " <br/>\n                                - Distance: " + transitStep.stepDistance + " miles <br/>\n                                - Duration: " + transitStep.stepDuration + " minutes <br/>\n                                - Number of Stops: " + transitStep.numberOfStop + " <br/>\n                                - Vehicle Name: " + transitStep.vehicleName + " <br/>\n                                - Vehicle Type: " + transitStep.vehicleType + " <br/>";
+                            }
+                        }
+                        session.send(directions);
+                        // repeat the dialog
+                        session.replaceDialog('/options');
+                    }
+                }
+            }
+>>>>>>> development
             else if (response.response.index == 1) {
                 // Check the rideshare service provider
                 if (rideshare.serviceProvider == "Uber") {
@@ -2382,6 +2801,9 @@ bot.dialog("/options", [
                     session.send("We could not find any ridesharing options here");
                 }
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> development
+=======
 >>>>>>> development
 =======
 >>>>>>> development
@@ -2391,10 +2813,13 @@ bot.dialog("/options", [
             }
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
             session.replaceDialog('/options');
         }
         else {
             session.endConversation("Thank you for using Travelr! Have a great day!");
+=======
+>>>>>>> development
 =======
 >>>>>>> development
 =======
@@ -2407,6 +2832,7 @@ bot.dialog("/info", [
         builder.Prompts.choice(session, "What information would you like to see", "Company Info|Privacy|How It Works|Finished");
     },
     function (session, response, next) {
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
         if (response.response.index == 0) {
@@ -2445,6 +2871,8 @@ bot.dialog("/info", [
 =======
 =======
 >>>>>>> development
+=======
+>>>>>>> development
         if (response.response) {
             if (response.response.index == 0) {
                 session.send("Company Info\n                \n                Travelr is all about creating a more enjoyable commuting experience.\n                \n                We are your urban travel guide to make your daily commute better we match your preferences and find the best options \n                avialable for you including price, time, group size, and a luxurious option.\n\n                By connecting users to one another we enhance the quality of everyone's dialy commute. This means that every user\n                depending on their choice will be able to find the quickest route, the cheapest ride, or the best luxury deal available.");
@@ -2460,6 +2888,9 @@ bot.dialog("/info", [
                 session.endDialog();
             }
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> development
+=======
 >>>>>>> development
 =======
 >>>>>>> development

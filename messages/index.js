@@ -190,7 +190,8 @@ bot.dialog("/favoriteLocations", [
         var locationMessage = new builder.Message(session)
             .attachmentLayout(builder.AttachmentLayout.carousel)
             .addAttachment(new builder.HeroCard(session)
-            .title("Custom"));
+            .title("Custom")
+            .subtitle("Select custom to enter a new address or location"));
         if (session.userData.phone && session.userData.pin) {
             var favoriteLocations = session.userData.favoriteLocations;
             for (var key in favoriteLocations) {
@@ -260,7 +261,8 @@ bot.dialog("/favoriteLocations", [
         var locationMessage = new builder.Message(session)
             .attachmentLayout(builder.AttachmentLayout.carousel)
             .addAttachment(new builder.HeroCard(session)
-            .title("Custom"));
+            .title("Custom")
+            .subtitle("Select custom to enter a new address or location"));
         //  Get the favorite locations
         var favoriteLocations = session.userData.favoriteLocations;
         // loop through each location and build out the buttons and hero card images

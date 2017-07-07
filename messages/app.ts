@@ -265,7 +265,8 @@ bot.dialog("/favoriteLocations", [
             .attachmentLayout(builder.AttachmentLayout.carousel)
             .addAttachment(new builder.HeroCard(session)
                 .title("Custom")
-        )
+                .subtitle("Select custom to enter a new address or location")
+        );
         if (session.userData.phone && session.userData.pin)
         {
             let favoriteLocations = session.userData.favoriteLocations;
@@ -363,6 +364,7 @@ bot.dialog("/favoriteLocations", [
             .attachmentLayout(builder.AttachmentLayout.carousel)
             .addAttachment(new builder.HeroCard(session)
                 .title("Custom")
+                .subtitle("Select custom to enter a new address or location")
         )
         
         //  Get the favorite locations

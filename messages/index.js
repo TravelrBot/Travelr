@@ -6,7 +6,9 @@ var request = require("request");
 var googleMaps = require("@google/maps");
 var process = require("process");
 var path = require("path");
-const botbuilder_azure = require("botbuilder-azure");
+var botbuilder_azure = require("botbuilder-azure");
+var azureStorage = require('azure-storage');
+var map_builder = require('./map_builder')
 
 //=========================================================
 // Google Maps Configure
@@ -188,7 +190,8 @@ bot.dialog("/favoriteLocations", [
         var locationMessage = new builder.Message(session)
             .attachmentLayout(builder.AttachmentLayout.carousel)
             .addAttachment(new builder.HeroCard(session)
-            .title("Custom"));
+            .title("Custom")
+            .subtitle("Select custom to enter a new address or location"));
         if (session.userData.phone && session.userData.pin) {
             var favoriteLocations = session.userData.favoriteLocations;
             for (var key in favoriteLocations) {
@@ -258,7 +261,8 @@ bot.dialog("/favoriteLocations", [
         var locationMessage = new builder.Message(session)
             .attachmentLayout(builder.AttachmentLayout.carousel)
             .addAttachment(new builder.HeroCard(session)
-            .title("Custom"));
+            .title("Custom")
+            .subtitle("Select custom to enter a new address or location"));
         //  Get the favorite locations
         var favoriteLocations = session.userData.favoriteLocations;
         // loop through each location and build out the buttons and hero card images

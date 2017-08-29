@@ -265,7 +265,8 @@ bot.dialog("/favoriteLocations", [
             .attachmentLayout(builder.AttachmentLayout.carousel)
             .addAttachment(new builder.HeroCard(session)
                 .title("Custom")
-        )
+                .subtitle("Select custom to enter a new address or location")
+        );
         if (session.userData.phone && session.userData.pin)
         {
             let favoriteLocations = session.userData.favoriteLocations;
@@ -341,10 +342,13 @@ bot.dialog("/favoriteLocations", [
                     let locationMessage: builder.Message = map_builder.map_card_builder(session, 
                     response.json.results[0].geometry.location.lat, 
                     response.json.results[0].geometry.location.lng);
-                    locationMessage.text("Here is your custom starting location. You can say say 'restart' to re-enter if it is wrong");
+                    locationMessage.text("Here is your custom starting location. You can say say 'redo locations' to re-enter if it is wrong");
 
                     console.log("Sending the location image message");
                     session.send(locationMessage); 
+                    
+                    // advance to the next dialog
+                    next();
                 }
                 // if there is an error 
                 else 
@@ -354,6 +358,14 @@ bot.dialog("/favoriteLocations", [
                 }
             })
         }
+        else // if the address was a favorite
+        {
+            // build the next set of cards
+            next();
+        }
+    },
+    (session:builder.Session, results: any, next: any) =>
+    {
 
         console.log("Asking for destination");
         let locationChoice: string[] = ["Custom"]
@@ -363,6 +375,7 @@ bot.dialog("/favoriteLocations", [
             .attachmentLayout(builder.AttachmentLayout.carousel)
             .addAttachment(new builder.HeroCard(session)
                 .title("Custom")
+                .subtitle("Select custom to enter a new address or location")
         )
         
         //  Get the favorite locations
@@ -435,7 +448,7 @@ bot.dialog("/favoriteLocations", [
                     response.json.results[0].geometry.location.lat, 
                     response.json.results[0].geometry.location.lng);
 
-                    locationMessage.text("Here is your destination. Say 'restart' to re enter");
+                    locationMessage.text("Here is your destination. Say 'redo locations' to re enter");
 
                     session.send(locationMessage);
                     
@@ -452,12 +465,14 @@ bot.dialog("/favoriteLocations", [
                 }
             })
         }
-
-        // Start the next dialog if a favorite was chosen
-        session.beginDialog("/preferences");
+        else
+        {
+            // Start the next dialog if a favorite was chosen
+            session.beginDialog("/preferences");
+        }
     }
 ]).reloadAction("reloadLocations", "Getting your location again", {
-    matches: [/^restart/i, /^start over/i, /^redo/i]
+    matches: [/^restart locations/i, /^start over/i, /^redo/i, /^restart location/i, /^redo locations/i,  /^redo locations/i]
 })
 
 bot.dialog('/customLocations', [
@@ -489,7 +504,7 @@ bot.dialog('/customLocations', [
                 let locationMessage: builder.Message = map_builder.map_card_builder(session, 
                 response.json.results[0].geometry.location.lat, 
                 response.json.results[0].geometry.location.lng);
-                locationMessage.text("Here is your starting location. Say 'restart' to re enter");
+                locationMessage.text("Here is your starting location. Say 'restart locations' to-re enter");
 
                 session.send(locationMessage);
                 console.log("Asking for destination");
@@ -528,7 +543,7 @@ bot.dialog('/customLocations', [
                 response.json.results[0].geometry.location.lat, 
                 response.json.results[0].geometry.location.lng);
 
-                locationMessage.text("Here is your destination. Say 'restart' to re enter");
+                locationMessage.text("Here is your destination. Say 'redo locations' to re-enter");
 
                 session.send(locationMessage);
                 
@@ -545,7 +560,9 @@ bot.dialog('/customLocations', [
             }
         });
     }
-])
+]).reloadAction("reloadLocations", "Getting your location again", {
+    matches: [/^restart locations/i, /^start over/i, /^redo/i, /^restart location/i, /^redo locations/i,  /^redo locations/i]
+})
 
 bot.dialog('/preferences', [
     function (session: builder.Session, args, next: any)
@@ -611,7 +628,7 @@ bot.dialog('/preferences', [
     
 ]).reloadAction("reloadPreferences", "Restarting Preference Gathering", {
     matches: [/^restart/i, /^start over/i]
-})
+}).beginDialogAction("reloadLocations", "/favoriteLocations", {matches: /^restart locations/i})
 
 
 
@@ -2401,7 +2418,7 @@ bot.dialog("/options", [
 bot.dialog("/info", [
     function(session: builder.Session): void
     {
-        builder.Prompts.choice(session, "What information would you like to see",
+        builder.Prompts.choice(session, "What information would you like to see?",
         "Company Info|Privacy|How It Works|Finished");
     },
 
@@ -2411,39 +2428,17 @@ bot.dialog("/info", [
         {
             if(response.response.index == 0)
             {
-                session.send(`Company Info
-                
-                Travelr is all about creating a more enjoyable commuting experience.
-                
-                We are your urban travel guide to make your daily commute better we match your preferences and find the best options 
-                avialable for you including price, time, group size, and a luxurious option.
-
-                By connecting users to one another we enhance the quality of everyone's dialy commute. This means that every user
-                depending on their choice will be able to find the quickest route, the cheapest ride, or the best luxury deal available.`
-                );
+                session.send(`Company Info: Travelr is all about creating a more enjoyable commuting experience. We are your urban travel guide to make your daily commute better. We match your preferences and find the best options available for you based on factors including: time, luxury, group size, and or price. By connecting users to one another we enhance the quality of everyone's dialy commute. This means that every user depending on their choice will be able to find the quickest route, the cheapest ride, or the best luxury deal available.`);
             }
 
             else if(response.response.index == 1)
             {
-                session.send(`Privacy
-                
-                Retainment of information
-
-                This bot is currently in beta. We do not ask for nor retain personal information including but not limited to: Name, DOB, Mailing or Biling Address, etc...
-                Although, not yet implemented, Travelr does intend to eventually retain your starting location, destiantion, and the best services our system produces. 
-                This information will eventually help us with creating a better and faster bot by allowing us to run analysis on the transportation systems in your geographic area.
-
-                Sale of information
-
-                We will not sell the retained informaiton. The informaiton will be used for our own purposes as stated above. We will update our privacy statements accordingly.`);
+                session.send(`Privacy: Retainment of information. This bot is currently in beta. We do not ask for nor retain personal information including: Name, DOB, Mailing or Billing Address. Travelr does retain your starting location, destiantion, and the best services our system produces. If you would like to create an account, we do ask for your phone number. We will not use or sell your phone number in anyway. It is just an easy way to remember an account. This information will eventually help us with creating a better and faster bot by allowing us to run analysis on the transportation systems in your geographic area. Sale of information. We will not sell the retained information. The information will be used for our own purposes as stated above. We will update our privacy statements accordingly.`);
             }
 
             else if(response.response.index == 2)
             {
-                session.send(`How It Works
-
-                Travelr asks the user for their commuting preferences and then it asks the user for their starting and ending locations. After
-                typing in their preferences and destination our algorithim internally finds the best choice for the user.`)
+                session.send(`How It Works: Travelr asks the user for their commuting preferences and then it asks the user for their starting and ending locations. After typing in their preferences and destination our algorithim internally finds the best choice for the user.`)
             }
             else
             {
@@ -2860,8 +2855,10 @@ bot.dialog('/edit', [
 bot.dialog('/commands', [
     (session: builder.Session) =>
     {
-        session.send("At anytime you can say the following commands: 'cancel', 'restart', 'help'. 'Cancel' stops bot," +
-        "'Restart' restarts the current step, and 'Help' launches the help guide");
+        session.send("At anytime you can say the following commands: 'cancel', 'restart', 'help'.")
+        session.send(" 'Cancel' stops bot and ends the current conversation")
+        session.send("'Restart' restarts the current step dialog.")
+        session.send("'Help' launches the help guide");
 
         session.endDialog("Returning you to the main help dialog!");
     }

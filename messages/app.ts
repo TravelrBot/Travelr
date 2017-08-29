@@ -342,7 +342,7 @@ bot.dialog("/favoriteLocations", [
                     let locationMessage: builder.Message = map_builder.map_card_builder(session, 
                     response.json.results[0].geometry.location.lat, 
                     response.json.results[0].geometry.location.lng);
-                    locationMessage.text("Here is your custom starting location. You can say say 'restart' to re-enter if it is wrong");
+                    locationMessage.text("Here is your custom starting location. You can say say 'redo locations' to re-enter if it is wrong");
 
                     console.log("Sending the location image message");
                     session.send(locationMessage); 
@@ -448,7 +448,7 @@ bot.dialog("/favoriteLocations", [
                     response.json.results[0].geometry.location.lat, 
                     response.json.results[0].geometry.location.lng);
 
-                    locationMessage.text("Here is your destination. Say 'restart' to re enter");
+                    locationMessage.text("Here is your destination. Say 'redo locations' to re enter");
 
                     session.send(locationMessage);
                     
@@ -472,7 +472,7 @@ bot.dialog("/favoriteLocations", [
         }
     }
 ]).reloadAction("reloadLocations", "Getting your location again", {
-    matches: [/^restart/i, /^start over/i, /^redo/i]
+    matches: [/^restart locations/i, /^start over/i, /^redo/i, /^restart location/i, /^redo locations/i,  /^redo locations/i]
 })
 
 bot.dialog('/customLocations', [
@@ -504,7 +504,7 @@ bot.dialog('/customLocations', [
                 let locationMessage: builder.Message = map_builder.map_card_builder(session, 
                 response.json.results[0].geometry.location.lat, 
                 response.json.results[0].geometry.location.lng);
-                locationMessage.text("Here is your starting location. Say 'restart' to re enter");
+                locationMessage.text("Here is your starting location. Say 'restart locations' to-re enter");
 
                 session.send(locationMessage);
                 console.log("Asking for destination");
@@ -543,7 +543,7 @@ bot.dialog('/customLocations', [
                 response.json.results[0].geometry.location.lat, 
                 response.json.results[0].geometry.location.lng);
 
-                locationMessage.text("Here is your destination. Say 'restart' to re enter");
+                locationMessage.text("Here is your destination. Say 'redo locations' to re-enter");
 
                 session.send(locationMessage);
                 
@@ -560,7 +560,9 @@ bot.dialog('/customLocations', [
             }
         });
     }
-])
+]).reloadAction("reloadLocations", "Getting your location again", {
+    matches: [/^restart locations/i, /^start over/i, /^redo/i, /^restart location/i, /^redo locations/i,  /^redo locations/i]
+})
 
 bot.dialog('/preferences', [
     function (session: builder.Session, args, next: any)
@@ -626,7 +628,7 @@ bot.dialog('/preferences', [
     
 ]).reloadAction("reloadPreferences", "Restarting Preference Gathering", {
     matches: [/^restart/i, /^start over/i]
-})
+}).beginDialogAction("reloadLocations", "/favoriteLocations", {matches: /^restart locations/i})
 
 
 
